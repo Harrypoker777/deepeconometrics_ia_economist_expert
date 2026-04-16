@@ -1,0 +1,14 @@
+{
+  "name": "deepeconometrics-lab",
+  "private": true,
+  "version": "2.0.0",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build:frontend": "npm run build --workspace frontend",
+    "lint:frontend": "npm run lint --workspace frontend"
+  }
+}

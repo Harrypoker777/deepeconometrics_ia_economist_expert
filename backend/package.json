@@ -1,0 +1,25 @@
+{
+  "name": "@deepeconometrics/backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.53",
+    "@fastify/cors": "^11.2.0",
+    "@react-pdf/renderer": "4.2.4",
+    "ai": "^6.0.158",
+    "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
+    "fastify": "^5.8.4",
+    "pg": "^8.20.0",
+    "react": "^19.2.5",
+    "zod": "^4.3.6"
+  },
+  "overrides": {
+    "@react-pdf/image": "3.0.4"
+  }
+}

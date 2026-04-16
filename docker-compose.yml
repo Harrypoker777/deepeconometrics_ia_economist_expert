@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: deepeconometrics-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: deepeconometrics
+      POSTGRES_USER: deepeconometrics
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deepeconometrics -d deepeconometrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    networks:
+      - backend
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: deepeconometrics-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: deepeconometrics
+      DB_USER: deepeconometrics
+      DB_PASSWORD: ${DB_PASSWORD}
+      ALLOWED_ORIGIN: ${FRONTEND_URL}
+      API_SECRET: ${API_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - generated_files:/app/generated-files
+    networks:
+      - backend
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: deepeconometrics-cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    depends_on:
+      - api
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  generated_files:
+
+networks:
+  backend:
+    name: backend
