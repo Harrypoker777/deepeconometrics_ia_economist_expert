@@ -48,7 +48,7 @@ app.setErrorHandler((error, request, reply) => {
   request.log.error(error);
 
   if (!reply.sent) {
-    reply.code(500).send({
+    reply.code(error.statusCode && error.statusCode >= 400 ? error.statusCode : 500).send({
       error: error.message || 'Internal server error',
     });
   }

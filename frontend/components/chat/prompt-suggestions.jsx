@@ -5,10 +5,10 @@ import { INDICATOR_PROMPTS } from '@/lib/chat-helpers';
 export function PromptSuggestions({ onSelect, variant = 'default' }) {
   const isHero = variant === 'hero';
   const wrapperClass = isHero
-    ? 'mt-8 grid w-full max-w-4xl gap-4 md:grid-cols-3'
+    ? 'mt-5 grid w-full max-w-3xl gap-2.5 md:grid-cols-3'
     : 'mt-6 grid w-full gap-3 md:grid-cols-3';
   const cardClass = isHero
-    ? 'rounded-2xl border border-border bg-card/80 px-4 py-4 text-left shadow-[0_18px_50px_-36px_rgba(15,23,42,0.35)] transition-all hover:-translate-y-0.5 hover:border-foreground/20'
+    ? 'rounded-xl border border-border bg-background px-3.5 py-3 text-left transition-colors hover:bg-secondary'
     : 'rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-secondary';
 
   return (
@@ -20,10 +20,10 @@ export function PromptSuggestions({ onSelect, variant = 'default' }) {
           onClick={() => onSelect(item.prompt)}
           className={cardClass}
         >
-          <span className="text-sm font-semibold text-foreground">
+          <span className="text-sm font-medium text-foreground">
             {item.label}
           </span>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          <p className="mt-1 text-xs leading-6 text-muted-foreground">
             {item.description}
           </p>
         </button>

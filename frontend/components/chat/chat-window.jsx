@@ -20,7 +20,7 @@ function ToolStatus({ part }) {
 
 export function ChatWindow({ messages, status, error }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {messages.map((message) => {
         const isAssistant = message.role === 'assistant';
         const text = stripChartBlocks(getMessageText(message));
@@ -39,7 +39,7 @@ export function ChatWindow({ messages, status, error }) {
               </p>
 
               {text && (
-                <div className="mt-1 whitespace-pre-wrap text-sm leading-7 text-foreground">
+                <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-foreground">
                   {text}
                 </div>
               )}
@@ -66,7 +66,7 @@ export function ChatWindow({ messages, status, error }) {
       )}
 
       {status === 'error' && error && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-sm text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span>{error.message}</span>
         </div>

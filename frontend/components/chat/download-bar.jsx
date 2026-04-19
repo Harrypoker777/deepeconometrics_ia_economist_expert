@@ -17,9 +17,9 @@ function iconFor(kind) {
 
 export function DownloadBar({ downloads }) {
   return (
-    <Card className="border-border/70 bg-card/75 backdrop-blur">
+    <Card className="border-border bg-card">
       <CardHeader>
-        <CardTitle className="text-2xl">DownloadBar</CardTitle>
+        <CardTitle>Descargas</CardTitle>
         <p className="text-sm text-muted-foreground">
           Detecta URLs de archivos en la respuesta o en la salida de tools y expone acciones de descarga.
         </p>
@@ -27,14 +27,14 @@ export function DownloadBar({ downloads }) {
 
       <CardContent>
         {downloads.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-border/70 bg-background/45 px-4 py-6 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-xl border border-dashed border-border bg-background px-4 py-6 text-sm leading-6 text-muted-foreground">
             Cuando el backend genere Excel o PDF, apareceran botones de descarga aqui.
           </div>
         ) : (
           <div className="flex flex-wrap gap-3">
             {downloads.map((item) => (
               <a
-                className={cn(buttonVariants({ variant: 'outline' }), 'rounded-2xl')}
+                className={cn(buttonVariants({ variant: 'outline' }), 'rounded-xl')}
                 href={item.url}
                 key={item.url}
                 rel="noreferrer"

@@ -69,20 +69,20 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-background p-6 shadow-[0_40px_120px_-60px_rgba(15,23,42,0.45)]">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-background p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Acceso
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-foreground">
+            <h2 className="mt-1 text-xl font-semibold text-foreground">
               {mode === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}
             </h2>
           </div>
@@ -96,13 +96,13 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 rounded-full bg-secondary p-1">
+        <div className="mt-4 grid grid-cols-2 rounded-xl bg-secondary p-1">
           <button
             type="button"
             onClick={() => setMode('login')}
-            className={`rounded-full px-3 py-2 text-sm transition-colors ${
+            className={`rounded-lg px-3 py-2 text-sm transition-colors ${
               mode === 'login'
-                ? 'bg-background text-foreground shadow-sm'
+                ? 'bg-background text-foreground'
                 : 'text-muted-foreground'
             }`}
           >
@@ -111,9 +111,9 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
           <button
             type="button"
             onClick={() => setMode('register')}
-            className={`rounded-full px-3 py-2 text-sm transition-colors ${
+            className={`rounded-lg px-3 py-2 text-sm transition-colors ${
               mode === 'register'
-                ? 'bg-background text-foreground shadow-sm'
+                ? 'bg-background text-foreground'
                 : 'text-muted-foreground'
             }`}
           >
@@ -121,7 +121,7 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
           </button>
         </div>
 
-        <div className="mt-5 rounded-[1.5rem] border border-border bg-card/70 px-4 py-4 text-sm text-muted-foreground">
+        <div className="mt-4 rounded-xl border border-border bg-secondary/50 px-4 py-4 text-sm text-muted-foreground">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex size-8 items-center justify-center rounded-full bg-secondary text-foreground">
               <ShieldCheck className="size-4" />
@@ -130,7 +130,7 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
               <p className="font-medium text-foreground">
                 Superusuario sembrado por defecto
               </p>
-              <p className="mt-1">
+              <p className="mt-1 text-xs sm:text-sm">
                 Correo: <span className="font-medium text-foreground">alinavarro2023@gmail.com</span>
               </p>
             </div>
@@ -146,7 +146,7 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
               type="email"
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
+              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
               placeholder="tu@correo.com"
               autoComplete="email"
               required
@@ -161,7 +161,7 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
               type="password"
               value={form.password}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-              className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
+              className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
               placeholder="Ingresa tu contrasena"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               required
@@ -177,7 +177,7 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
                 type="password"
                 value={form.confirmPassword}
                 onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))}
-                className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
+                className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-foreground/20"
                 placeholder="Repite la contrasena"
                 autoComplete="new-password"
                 required
@@ -186,7 +186,7 @@ export function AuthDialog({ onAuthenticated, onClose, open }) {
           )}
 
           {error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300">
               {error}
             </div>
           )}

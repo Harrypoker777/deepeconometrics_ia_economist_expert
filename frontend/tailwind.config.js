@@ -32,14 +32,7 @@ module.exports = {
         '3xl': '2rem',
       },
       fontFamily: {
-        sans: ['var(--font-manrope)'],
-        display: ['var(--font-space-grotesk)'],
-      },
-      boxShadow: {
-        glow: '0 30px 120px rgba(32, 96, 255, 0.18)',
-      },
-      backgroundImage: {
-        'grid-fade': 'linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.08) 1px, transparent 1px)',
+        sans: ['var(--font-inter)'],
       },
     },
   },

@@ -15,7 +15,7 @@ import {
 function SettingsMenu({ collapsed, onClearHistory, onLogout, onOpenAccount }) {
   return (
     <div
-      className={`absolute bottom-12 z-20 rounded-2xl border border-border bg-background p-2 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.45)] ${
+      className={`absolute bottom-12 z-20 rounded-xl border border-border bg-background p-1.5 ${
         collapsed ? 'left-12 w-56' : 'left-3 right-3'
       }`}
     >
@@ -40,7 +40,7 @@ function SettingsMenu({ collapsed, onClearHistory, onLogout, onOpenAccount }) {
       <button
         type="button"
         onClick={onLogout}
-        className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+        className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
       >
         <LogOut className="size-4" />
         Cerrar sesion
@@ -53,7 +53,7 @@ function SessionRow({ active, onDelete, onSelect, title }) {
   return (
     <div
       className={`group mb-1 flex items-center gap-1 rounded-xl ${
-        active ? 'bg-secondary' : 'hover:bg-secondary/60'
+        active ? 'bg-secondary' : 'hover:bg-secondary'
       }`}
     >
       <button
@@ -159,7 +159,7 @@ export function ChatSidebar({
         <button
           type="button"
           onClick={onNewChat}
-          className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/85"
+          className="flex items-center gap-2 rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
         >
           <Plus className="size-4" />
           Nuevo chat
@@ -194,7 +194,7 @@ export function ChatSidebar({
       </div>
 
       <div className="relative border-t px-3 py-3">
-        <div className="flex items-center gap-2 rounded-2xl border border-border bg-background/80 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
           <div className="flex size-9 items-center justify-center rounded-full bg-secondary text-foreground">
             <UserRound className="size-4" />
           </div>

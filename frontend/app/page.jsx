@@ -5,6 +5,7 @@ import { useChat } from '@ai-sdk/react';
 import { lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { ArrowDown } from 'lucide-react';
 import { AuthDialog } from '@/components/auth/auth-dialog';
+import { DeepEconometricsLogo } from '@/components/brand/deepeconometrics-logo';
 import { AccountDialog } from '@/components/chat/account-dialog';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatSidebar } from '@/components/chat/chat-sidebar';
@@ -25,14 +26,6 @@ function createSessionId() {
 
 function getUserSessionStorageKey(userId) {
   return `deepeconometrics.user-session:${userId}`;
-}
-
-function BrandMark({ label = 'DE' }) {
-  return (
-    <div className="flex size-16 items-center justify-center rounded-full border border-dashed border-border bg-card/80 text-sm font-semibold tracking-[0.18em] text-foreground">
-      {label}
-    </div>
-  );
 }
 
 export default function HomePage() {
@@ -485,8 +478,8 @@ export default function HomePage() {
               <div className="mx-auto max-w-3xl px-4 py-6">
                 {isEmpty ? (
                   <div className="flex flex-col items-center justify-center pt-[16vh] text-center">
-                    <BrandMark />
-                    <h2 className="mt-5 text-2xl font-semibold text-foreground">
+                    <DeepEconometricsLogo className="h-16 w-auto" />
+                    <h2 className="mt-4 text-xl font-semibold text-foreground">
                       DeepEconometrics listo para una nueva conversacion
                     </h2>
                     <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
@@ -534,19 +527,17 @@ export default function HomePage() {
           </div>
         </div>
       ) : (
-        <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.06),_transparent_38%),linear-gradient(180deg,_hsl(var(--background)),_rgba(248,250,252,0.88))]">
-          <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6">
-            <header className="flex items-center justify-between py-6">
+        <div className="min-h-screen bg-background">
+          <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 sm:px-6">
+            <header className="flex items-center justify-between py-4">
               <div className="flex items-center gap-3">
-                <div className="flex size-11 items-center justify-center rounded-2xl border border-dashed border-border bg-card/80 text-xs font-semibold tracking-[0.18em] text-foreground">
-                  LOGO
-                </div>
+                <DeepEconometricsLogo className="h-10 w-auto" />
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     DeepEconometrics
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Modo anonimo sin historial persistente
+                    Chat anonimo sin historial
                   </p>
                 </div>
               </div>
@@ -564,16 +555,16 @@ export default function HomePage() {
             </header>
 
             {isEmpty ? (
-              <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
-                <BrandMark label="LOGO" />
-                <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
+              <div className="flex flex-1 flex-col items-center justify-center pb-12 text-center">
+                <DeepEconometricsLogo className="h-20 w-auto" />
+                <h1 className="mt-5 max-w-2xl text-2xl font-semibold tracking-tight text-foreground sm:text-[2rem]">
                   Comienza a hablar con DeepEconometrics
                 </h1>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+                <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
                   Haz preguntas sobre inflacion, PIB, pronosticos y reportes. Si no has iniciado sesion, todo desaparece al recargar la pagina.
                 </p>
 
-                <div className="mt-10 w-full max-w-4xl">
+                <div className="mt-8 w-full max-w-3xl">
                   <ChatComposer
                     busy={busy}
                     disabled={!sessionId}
@@ -599,7 +590,7 @@ export default function HomePage() {
             ) : (
               <div className="flex flex-1 flex-col">
                 <div ref={scrollRef} className="flex-1 overflow-y-auto">
-                  <div className="mx-auto w-full max-w-4xl py-6">
+                  <div className="mx-auto w-full max-w-3xl py-6">
                     <ChatWindow error={error} messages={messages} status={status} />
 
                     {chartPayload && (
@@ -612,7 +603,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="mx-auto w-full max-w-4xl pb-8 pt-4">
+                <div className="mx-auto w-full max-w-3xl pb-8 pt-4">
                   <ChatComposer
                     busy={busy}
                     disabled={!sessionId}
