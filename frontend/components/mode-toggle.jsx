@@ -16,30 +16,32 @@ export function ModeToggle() {
   if (!mounted) {
     return (
       <Button
-        aria-label="Cambiar tema"
-        className="rounded-full"
-        disabled
         type="button"
         variant="outline"
+        size="sm"
+        className="rounded-full px-3"
+        disabled
+        aria-label="Cambiar tema"
       >
         <Moon className="size-4" />
-        <span>Oscuro</span>
+        <span className="hidden sm:inline">Tema</span>
       </Button>
     );
   }
 
-  const nextTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
+  const dark = resolvedTheme === 'dark';
 
   return (
     <Button
-      aria-label="Cambiar tema"
-      className="rounded-full"
-      onClick={() => setTheme(nextTheme)}
       type="button"
       variant="outline"
+      size="sm"
+      className="rounded-full px-3"
+      onClick={() => setTheme(dark ? 'light' : 'dark')}
+      aria-label="Cambiar tema"
     >
-      {resolvedTheme === 'dark' ? <SunMedium className="size-4" /> : <Moon className="size-4" />}
-      <span>{resolvedTheme === 'dark' ? 'Claro' : 'Oscuro'}</span>
+      {dark ? <SunMedium className="size-4" /> : <Moon className="size-4" />}
+      <span className="hidden sm:inline">{dark ? 'Light' : 'Dark'}</span>
     </Button>
   );
 }

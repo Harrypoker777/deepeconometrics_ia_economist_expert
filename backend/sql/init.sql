@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS indicadores (
   id SERIAL PRIMARY KEY,
   codigo TEXT NOT NULL UNIQUE,
@@ -5,7 +7,10 @@ CREATE TABLE IF NOT EXISTS indicadores (
   unidad TEXT NOT NULL,
   frecuencia TEXT NOT NULL,
   descripcion TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  pais TEXT,
+  fuente TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS series_tiempo (

@@ -5,13 +5,21 @@ import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { buildForecast } from '../lib/forecast.js';
 import { storeGeneratedFile } from '../lib/files.js';
+import {
+  listKnowledgeCategories,
+  listKnowledgeDocuments,
+  searchKnowledge,
+} from '../lib/knowledge.js';
+import {
+  EXTERNAL_SOURCES,
+  ingestExternalSeries,
+} from '../lib/external-sources.js';
 
 async function loadIndicators(queryClient, searchQuery, limit) {
   const words = searchQuery.split(/\s+/).filter(Boolean);
-  const likePattern = words.length > 0 ? words.join('%') : '';
   const indicatorsResult = await queryClient(
     `
-      SELECT id, codigo, nombre, unidad, frecuencia, descripcion
+      SELECT id, codigo, nombre, unidad, frecuencia, descripcion, pais, fuente
       FROM indicadores
       WHERE $1 = ''
         OR codigo ILIKE '%' || $1 || '%'
@@ -24,9 +32,7 @@ async function loadIndicators(queryClient, searchQuery, limit) {
     [searchQuery, limit, ...words]
   );
 
-  if (indicatorsResult.rows.length === 0) {
-    return [];
-  }
+  if (indicatorsResult.rows.length === 0) return [];
 
   const ids = indicatorsResult.rows.map((row) => row.id);
   const seriesResult = await queryClient(
@@ -64,10 +70,7 @@ async function loadIndicatorSeries(queryClient, indicator) {
   );
 
   const match = indicatorResult.rows[0];
-
-  if (!match) {
-    throw new Error(`No se encontro un indicador para "${indicator}".`);
-  }
+  if (!match) throw new Error(`No se encontro un indicador para "${indicator}".`);
 
   const seriesResult = await queryClient(
     `
@@ -89,71 +92,121 @@ async function loadIndicatorSeries(queryClient, indicator) {
 }
 
 const pdfStyles = StyleSheet.create({
-  page: {
-    padding: 32,
-    fontSize: 11,
-    fontFamily: 'Helvetica',
-    color: '#0f172a',
-  },
-  heading: {
-    fontSize: 20,
-    marginBottom: 8,
-  },
-  paragraph: {
-    marginBottom: 10,
-    lineHeight: 1.45,
-  },
-  section: {
-    marginTop: 12,
-    marginBottom: 12,
-    padding: 12,
-    border: '1 solid #cbd5e1',
-    borderRadius: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  small: {
-    fontSize: 9,
-    color: '#475569',
-  },
+  page: { padding: 32, fontSize: 11, fontFamily: 'Helvetica', color: '#0f172a' },
+  heading: { fontSize: 20, marginBottom: 8 },
+  paragraph: { marginBottom: 10, lineHeight: 1.45 },
+  section: { marginTop: 12, marginBottom: 12, padding: 12, border: '1 solid #cbd5e1', borderRadius: 8 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  small: { fontSize: 9, color: '#475569' },
 });
 
 export function createEconomicTools({ queryClient, request, sessionId }) {
   return {
-    read_indicators: tool({
-      description: 'Consulta indicadores economicos y devuelve metadatos junto con sus ultimos valores historicos en PostgreSQL.',
+    search_knowledge_base: tool({
+      description:
+        'Recupera pasajes relevantes de la base de conocimiento RAG (premios Nobel, conceptos economicos, historia del pensamiento economico y descripcion de fuentes). Usala cuando el usuario pregunte por teoria economica, escuelas, autores, opiniones de laureados, definiciones o guias sobre fuentes de datos.',
       inputSchema: z.object({
-        query: z.string().default('').describe('Codigo, nombre o termino relacionado con el indicador.'),
-        limit: z.number().int().min(1).max(10).default(5).describe('Numero maximo de indicadores a devolver.'),
+        query: z.string().min(3).describe('Pregunta o tema a investigar en la base de conocimiento.'),
+        category: z
+          .enum(['nobel', 'conceptos', 'pensamiento', 'fuentes', 'meta', 'general'])
+          .optional()
+          .describe('Filtro opcional por categoria de documento.'),
+        limit: z.number().int().min(1).max(8).default(4),
+      }),
+      execute: async ({ query, category, limit }) => {
+        const results = await searchKnowledge({ q: query, limit, category: category || null });
+        return {
+          total: results.length,
+          query,
+          category: category || null,
+          passages: results.map((row) => ({
+            slug: row.slug,
+            title: row.title,
+            category: row.category,
+            author: row.author,
+            source: row.source,
+            tags: row.tags,
+            similarity: row.similarity,
+            content: row.content,
+          })),
+        };
+      },
+    }),
+
+    list_knowledge_topics: tool({
+      description:
+        'Lista las categorias y documentos disponibles en la base de conocimiento. Util cuando el usuario pregunta "que temas puedes explicar".',
+      inputSchema: z.object({
+        category: z.string().optional(),
+        limit: z.number().int().min(1).max(100).default(40),
+      }),
+      execute: async ({ category, limit }) => {
+        const [categories, documents] = await Promise.all([
+          listKnowledgeCategories(),
+          listKnowledgeDocuments({ category: category || null, limit }),
+        ]);
+        return { categories, documents };
+      },
+    }),
+
+    read_indicators: tool({
+      description:
+        'Consulta indicadores economicos almacenados en PostgreSQL y devuelve metadatos con sus ultimos valores.',
+      inputSchema: z.object({
+        query: z.string().default('').describe('Codigo, nombre o termino relacionado.'),
+        limit: z.number().int().min(1).max(10).default(5),
       }),
       execute: async ({ query, limit }) => {
         const indicators = await loadIndicators(queryClient, query.trim(), limit);
+        return { total: indicators.length, indicators };
+      },
+    }),
 
+    ingest_external_series: tool({
+      description:
+        'Descarga una serie economica desde una fuente oficial (FRED, World Bank, IMF, ECB) y la guarda en la base de datos local. Usala cuando el usuario pida datos que no existen en la base local.',
+      inputSchema: z.object({
+        source: z.enum(['fred', 'worldbank', 'imf', 'ecb']),
+        codigo: z.string().min(2).describe('Codigo con el que se guardara el indicador en la base local.'),
+        nombre: z.string().min(3),
+        unidad: z.string().min(1),
+        frecuencia: z.enum(['diaria', 'semanal', 'mensual', 'trimestral', 'anual']),
+        descripcion: z.string().min(3),
+        params: z
+          .object({
+            seriesId: z.string().optional(),
+            country: z.string().optional(),
+            countryIso3: z.string().optional(),
+            indicator: z.string().optional(),
+            flowRef: z.string().optional(),
+            seriesKey: z.string().optional(),
+            startDate: z.string().optional(),
+            endDate: z.string().optional(),
+            startYear: z.string().optional(),
+            endYear: z.string().optional(),
+          })
+          .describe('Parametros especificos de la fuente (ver knowledge/fuentes).'),
+      }),
+      execute: async (input) => {
+        const result = await ingestExternalSeries(input);
         return {
-          total: indicators.length,
-          indicators,
+          source: input.source,
+          sourceInfo: EXTERNAL_SOURCES[input.source] || null,
+          ...result,
         };
       },
     }),
 
     generate_forecast: tool({
-      description: 'Genera una proyeccion OLS en JavaScript puro a partir de un indicador almacenado o de una serie provista.',
+      description:
+        'Genera una proyeccion OLS en JavaScript puro a partir de un indicador almacenado o de una serie provista. Devuelve la serie historica + forecast con bandas de confianza en el formato estandar de grafico (field "chart").',
       inputSchema: z.object({
-        indicator: z.string().optional().describe('Codigo o nombre del indicador a pronosticar si la serie viene de la base de datos.'),
-        horizon: z.number().int().min(1).max(24).default(6).describe('Numero de periodos futuros a estimar.'),
-        confidenceLevel: z.number().min(0.8).max(0.99).default(0.95).describe('Nivel de confianza aproximado para la banda.'),
+        indicator: z.string().optional(),
+        horizon: z.number().int().min(1).max(24).default(6),
+        confidenceLevel: z.number().min(0.8).max(0.99).default(0.95),
         observations: z
-          .array(
-            z.object({
-              label: z.string(),
-              value: z.number(),
-            })
-          )
-          .optional()
-          .describe('Serie opcional si ya tienes puntos historicos en contexto.'),
+          .array(z.object({ label: z.string(), value: z.number() }))
+          .optional(),
       }),
       execute: async ({ indicator, horizon, confidenceLevel, observations }) => {
         let sourceSeries = observations;
@@ -173,21 +226,51 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
         const title = indicatorMeta
           ? `Proyeccion de ${indicatorMeta.nombre}`
           : 'Proyeccion econometrica';
+        const summary = `Forecast OLS a ${horizon} periodos con banda aproximada al ${(confidenceLevel * 100).toFixed(0)}%.`;
 
         return {
           indicator: indicatorMeta,
           title,
-          summary: `Forecast OLS a ${horizon} periodos con banda aproximada al ${(confidenceLevel * 100).toFixed(0)}%.`,
+          summary,
+          chart: {
+            title,
+            summary,
+            series: result.series,
+          },
           ...result,
         };
       },
     }),
 
-    generate_excel: tool({
-      description: 'Genera un archivo Excel con resultados historicos y proyectados y devuelve una URL de descarga.',
+    generate_chart: tool({
+      description:
+        'Empaqueta una serie historica u observaciones del usuario en el formato estandar de grafico (sin proyectar). Usala cuando solo quieras visualizar datos existentes.',
       inputSchema: z.object({
-        title: z.string().describe('Titulo del archivo o del reporte.'),
-        summary: z.string().describe('Resumen corto del analisis incluido en el archivo.'),
+        title: z.string(),
+        summary: z.string().default(''),
+        series: z.array(
+          z.object({
+            label: z.string(),
+            value: z.number(),
+            lower: z.number().nullable().optional(),
+            upper: z.number().nullable().optional(),
+            type: z.enum(['historical', 'forecast']).default('historical'),
+          })
+        ),
+      }),
+      execute: async ({ title, summary, series }) => ({
+        chart: { title, summary, series },
+        title,
+        summary,
+      }),
+    }),
+
+    generate_excel: tool({
+      description:
+        'Genera un archivo Excel con resultados historicos y proyectados; devuelve una URL de descarga.',
+      inputSchema: z.object({
+        title: z.string(),
+        summary: z.string(),
         rows: z.array(
           z.object({
             period: z.string(),
@@ -246,8 +329,8 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
     generate_pdf: tool({
       description: 'Genera un PDF ejecutivo con el resumen del forecast y su URL de descarga.',
       inputSchema: z.object({
-        title: z.string().describe('Titulo del reporte.'),
-        summary: z.string().describe('Resumen del forecast para ejecutivos.'),
+        title: z.string(),
+        summary: z.string(),
         rows: z.array(
           z.object({
             period: z.string(),

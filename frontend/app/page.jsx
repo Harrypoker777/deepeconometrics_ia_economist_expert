@@ -3,22 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
-import { ArrowDown } from 'lucide-react';
+import { CheckCircle2, CircleAlert, LoaderCircle, LogIn, Plus, Sparkles } from 'lucide-react';
 import { AuthDialog } from '@/components/auth/auth-dialog';
-import { DeepEconometricsLogo } from '@/components/brand/deepeconometrics-logo';
 import { AccountDialog } from '@/components/chat/account-dialog';
 import { ChatComposer } from '@/components/chat/chat-composer';
+import { ChatRightRail } from '@/components/chat/chat-right-rail';
 import { ChatSidebar } from '@/components/chat/chat-sidebar';
 import { ChatWindow } from '@/components/chat/chat-window';
-import { EconomicChart } from '@/components/chat/economic-chart';
 import { PromptSuggestions } from '@/components/chat/prompt-suggestions';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Button } from '@/components/ui/button';
 import { apiFetch, createChatTransport } from '@/lib/api';
-import {
-  extractDownloadLinks,
-  findLatestChartPayload,
-} from '@/lib/chat-helpers';
+
+const EMPTY_STATE_POINTS = [
+  'Chat-first workspace',
+  'RAG economico',
+  'Forecast y exports',
+];
 
 function createSessionId() {
   return crypto.randomUUID();
@@ -28,13 +29,145 @@ function getUserSessionStorageKey(userId) {
   return `deepeconometrics.user-session:${userId}`;
 }
 
+function EmptyWorkspace({ isAuthenticated, onOpenAuth, onSelectPrompt }) {
+  return (
+    <div className="flex min-h-[48vh] flex-col items-center justify-center py-8 text-center sm:min-h-[54vh]">
+      <div className="flex size-14 items-center justify-center rounded-[1.35rem] bg-secondary/80 text-foreground shadow-soft">
+        <Sparkles className="size-6" />
+      </div>
+
+      <p className="mt-6 text-sm font-medium text-muted-foreground">
+        DeepEconometrics workspace
+      </p>
+
+      <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-foreground sm:text-5xl">
+        Pregunta por datos, teoria o pronosticos sin salir del chat.
+      </h1>
+
+      <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-[15px]">
+        Interfaz minimal, modo oscuro por defecto y flujo unificado para indicadores,
+        conocimiento economico, scraping y dashboards.
+      </p>
+
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        {EMPTY_STATE_POINTS.map((item) => (
+          <span key={item} className="status-pill">
+            <span className="dot-pulse" />
+            {item}
+          </span>
+        ))}
+      </div>
+
+      {!isAuthenticated && (
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-6 rounded-full px-5"
+          onClick={onOpenAuth}
+        >
+          <LogIn className="size-4" />
+          Iniciar sesion
+        </Button>
+      )}
+
+      <div className="mt-10 w-full max-w-4xl">
+        <PromptSuggestions
+          variant="compact"
+          onSelect={(prompt) => {
+            void onSelectPrompt(prompt);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceTopbar({
+  busy,
+  currentTitle,
+  error,
+  isAuthenticated,
+  isEmpty,
+  onNewChat,
+  onOpenAuth,
+}) {
+  const stateLabel = busy ? 'Thinking' : error ? 'Error' : 'Ready';
+  const subtitle = isEmpty
+    ? isAuthenticated
+      ? 'Nuevo chat listo para guardar contexto, activar tools y seguir sesiones.'
+      : 'Sesion temporal lista para consultar RAG, indicadores o forecasts.'
+    : busy
+      ? 'El agente esta consultando herramientas, datos y base de conocimiento.'
+      : 'Workspace listo para continuar la conversacion o abrir un nuevo analisis.';
+
+  return (
+    <header className="topbar-surface border-b border-border/75 px-4 py-4 sm:px-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="eyebrow">
+              OpenAI-inspired workspace
+            </span>
+
+            {error && (
+              <span className="status-pill text-red-400">
+                <CircleAlert className="size-3.5" />
+                Needs attention
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 text-sm font-medium text-muted-foreground">
+            DeepEconometrics
+          </p>
+
+          <h2 className="mt-1 truncate text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+            {currentTitle}
+          </h2>
+
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {subtitle}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="status-pill">
+            {error ? (
+              <CircleAlert className="size-3.5 text-red-400" />
+            ) : busy ? (
+              <LoaderCircle className="size-3.5 animate-spin text-accent-strong" />
+            ) : (
+              <CheckCircle2 className="size-3.5 text-accent-strong" />
+            )}
+            {stateLabel}
+          </span>
+
+          <Button type="button" variant="ghost" onClick={onNewChat}>
+            <Plus className="size-4" />
+            Nuevo chat
+          </Button>
+
+          {!isAuthenticated && (
+            <Button type="button" variant="outline" onClick={onOpenAuth}>
+              <LogIn className="size-4" />
+              Iniciar sesion
+            </Button>
+          )}
+
+          <ModeToggle />
+        </div>
+      </div>
+    </header>
+  );
+}
+
 export default function HomePage() {
   const [authReady, setAuthReady] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const [draft, setDraft] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [sessions, setSessions] = useState([]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const scrollRef = useRef(null);
@@ -43,9 +176,7 @@ export default function HomePage() {
     sessionId: '',
     persist: false,
   });
-  const transportRef = useRef(
-    createChatTransport(() => requestBodyRef.current)
-  );
+  const transportRef = useRef(createChatTransport(() => requestBodyRef.current));
 
   requestBodyRef.current = {
     sessionId,
@@ -96,10 +227,9 @@ export default function HomePage() {
   });
 
   const busy = status === 'submitted' || status === 'streaming';
-  const chartPayload = findLatestChartPayload(messages);
-  const downloadLinks = extractDownloadLinks(messages);
   const isAuthenticated = Boolean(authUser);
   const isEmpty = messages.length === 0;
+  const currentSession = sessions.find((session) => session.sessionId === sessionId) || null;
 
   const startAnonymousWorkspace = useCallback(() => {
     setSessions([]);
@@ -223,6 +353,15 @@ export default function HomePage() {
     return () => {
       isActive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    setSidebarCollapsed(!mediaQuery.matches);
   }, []);
 
   useEffect(() => {
@@ -399,36 +538,24 @@ export default function HomePage() {
     setDraft('');
   }, [setMessages, stop]);
 
-  function renderDownloads() {
-    if (downloadLinks.length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="mt-4 flex flex-wrap gap-2">
-        {downloadLinks.map((item) => (
-          <a
-            key={item.url}
-            href={item.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
-          >
-            <ArrowDown className="size-3.5" />
-            {item.label}
-          </a>
-        ))}
-      </div>
-    );
-  }
-
   if (!authReady) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Cargando DeepEconometrics...
+      <div className="app-shell flex min-h-screen items-center justify-center p-6">
+        <div className="panel-surface rounded-[1.75rem] px-8 py-10 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-secondary/80 text-foreground">
+            <Sparkles className="size-5 animate-float" />
+          </div>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Cargando DeepEconometrics...
+          </p>
+        </div>
       </div>
     );
   }
+
+  const currentTitle = isEmpty
+    ? 'Nuevo chat'
+    : currentSession?.title || (isAuthenticated ? 'Conversacion activa' : 'Sesion temporal');
 
   return (
     <>
@@ -444,11 +571,13 @@ export default function HomePage() {
         user={authUser}
       />
 
-      {isAuthenticated ? (
-        <div className="flex h-screen bg-background">
+      <div className="app-shell">
+        <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-3 p-3 sm:p-4">
           <ChatSidebar
             collapsed={sidebarCollapsed}
             currentSessionId={sessionId}
+            isAuthenticated={isAuthenticated}
+            onAuthenticate={() => setShowAuthDialog(true)}
             onClearHistory={handleClearHistory}
             onDeleteSession={handleDeleteSession}
             onLogout={handleLogout}
@@ -457,172 +586,73 @@ export default function HomePage() {
             onSelectSession={handleSelectSession}
             onToggle={() => setSidebarCollapsed((current) => !current)}
             sessions={sessions}
-            userEmail={authUser.email}
+            userEmail={authUser?.email || ''}
           />
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            <header className="flex shrink-0 items-center justify-between border-b px-4 py-3">
-              <div>
-                <h1 className="text-base font-semibold text-foreground">
-                  DeepEconometrics
-                </h1>
-                <p className="text-xs text-muted-foreground">
-                  IA de finanzas y economia con historial por sesion.
-                </p>
-              </div>
+          <main className="workspace-panel panel-surface flex min-w-0 flex-1 overflow-hidden rounded-[1.9rem]">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <WorkspaceTopbar
+                busy={busy}
+                currentTitle={currentTitle}
+                error={error}
+                isAuthenticated={isAuthenticated}
+                isEmpty={isEmpty}
+                onNewChat={handleNewChat}
+                onOpenAuth={() => setShowAuthDialog(true)}
+              />
 
-              <ModeToggle />
-            </header>
-
-            <div ref={scrollRef} className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-3xl px-4 py-6">
-                {isEmpty ? (
-                  <div className="flex flex-col items-center justify-center pt-[16vh] text-center">
-                    <DeepEconometricsLogo className="h-16 w-auto" />
-                    <h2 className="mt-4 text-xl font-semibold text-foreground">
-                      DeepEconometrics listo para una nueva conversacion
-                    </h2>
-                    <p className="mt-2 max-w-xl text-sm leading-7 text-muted-foreground">
-                      Tu historial queda guardado en esta cuenta y se organiza por sesiones.
-                    </p>
-                    <PromptSuggestions
-                      onSelect={(prompt) => {
-                        void handleSuggestion(prompt);
-                      }}
-                    />
+              <div className="flex min-h-0 flex-1">
+                <section className="flex min-w-0 flex-1 flex-col">
+                  <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+                    <div className="mx-auto flex w-full max-w-[54rem] flex-col px-4 pb-36 pt-8 sm:px-6 lg:px-8">
+                      {isEmpty ? (
+                        <EmptyWorkspace
+                          isAuthenticated={isAuthenticated}
+                          onOpenAuth={() => setShowAuthDialog(true)}
+                          onSelectPrompt={handleSuggestion}
+                        />
+                      ) : (
+                        <ChatWindow error={error} messages={messages} status={status} />
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <ChatWindow error={error} messages={messages} status={status} />
 
-                    {chartPayload && (
-                      <div className="mt-6">
-                        <EconomicChart chart={chartPayload} />
-                      </div>
-                    )}
+                  <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background via-background/96 to-background/0 px-4 pb-4 pt-6 sm:px-6 lg:px-8">
+                    <div className="mx-auto w-full max-w-[54rem]">
+                      <ChatComposer
+                        busy={busy}
+                        disabled={!sessionId}
+                        draft={draft}
+                        helperText={isAuthenticated
+                          ? 'Esta conversacion queda asociada a tu cuenta y puede retomarse despues.'
+                          : 'Modo temporal: puedes usar el agente sin login, pero el historial se limpia al recargar.'}
+                        onChange={setDraft}
+                        onKeyDown={handleKeyDown}
+                        onStop={stop}
+                        onSubmit={handleSubmit}
+                        placeholder="Escribe una pregunta sobre inflacion, PIB, teoria economica, scraping o un forecast..."
+                        textareaRef={textareaRef}
+                        variant={isEmpty ? 'hero' : 'docked'}
+                      />
+                    </div>
+                  </div>
+                </section>
 
-                    {renderDownloads()}
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="shrink-0 border-t bg-background px-4 pb-4 pt-3">
-              <div className="mx-auto max-w-3xl">
-                <ChatComposer
+                <ChatRightRail
                   busy={busy}
-                  disabled={!sessionId}
-                  draft={draft}
-                  helperText="Los chats de esta cuenta se guardan por sesion."
-                  onChange={setDraft}
-                  onKeyDown={handleKeyDown}
-                  onStop={stop}
-                  onSubmit={handleSubmit}
-                  placeholder="Escribe tu consulta economica..."
-                  textareaRef={textareaRef}
-                  variant="docked"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="min-h-screen bg-background">
-          <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 sm:px-6">
-            <header className="flex items-center justify-between py-4">
-              <div className="flex items-center gap-3">
-                <DeepEconometricsLogo className="h-10 w-auto" />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    DeepEconometrics
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Chat anonimo sin historial
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAuthDialog(true)}
-                >
-                  Iniciar sesion
-                </Button>
-                <ModeToggle />
-              </div>
-            </header>
-
-            {isEmpty ? (
-              <div className="flex flex-1 flex-col items-center justify-center pb-12 text-center">
-                <DeepEconometricsLogo className="h-20 w-auto" />
-                <h1 className="mt-5 max-w-2xl text-2xl font-semibold tracking-tight text-foreground sm:text-[2rem]">
-                  Comienza a hablar con DeepEconometrics
-                </h1>
-                <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-                  Haz preguntas sobre inflacion, PIB, pronosticos y reportes. Si no has iniciado sesion, todo desaparece al recargar la pagina.
-                </p>
-
-                <div className="mt-8 w-full max-w-3xl">
-                  <ChatComposer
-                    busy={busy}
-                    disabled={!sessionId}
-                    draft={draft}
-                    helperText="Modo anonimo: el historial no se guarda y se borra al recargar."
-                    onChange={setDraft}
-                    onKeyDown={handleKeyDown}
-                    onStop={stop}
-                    onSubmit={handleSubmit}
-                    placeholder="Escribe tu pregunta economica..."
-                    textareaRef={textareaRef}
-                    variant="hero"
-                  />
-                </div>
-
-                <PromptSuggestions
-                  variant="hero"
-                  onSelect={(prompt) => {
+                  currentSessionTitle={currentSession?.title || ''}
+                  isAuthenticated={isAuthenticated}
+                  messages={messages}
+                  onInsertPrompt={(prompt) => {
                     void handleSuggestion(prompt);
                   }}
+                  onOpenAuth={() => setShowAuthDialog(true)}
                 />
               </div>
-            ) : (
-              <div className="flex flex-1 flex-col">
-                <div ref={scrollRef} className="flex-1 overflow-y-auto">
-                  <div className="mx-auto w-full max-w-3xl py-6">
-                    <ChatWindow error={error} messages={messages} status={status} />
-
-                    {chartPayload && (
-                      <div className="mt-6">
-                        <EconomicChart chart={chartPayload} />
-                      </div>
-                    )}
-
-                    {renderDownloads()}
-                  </div>
-                </div>
-
-                <div className="mx-auto w-full max-w-3xl pb-8 pt-4">
-                  <ChatComposer
-                    busy={busy}
-                    disabled={!sessionId}
-                    draft={draft}
-                    helperText="Modo anonimo: el historial no se guarda y se borra al recargar."
-                    onChange={setDraft}
-                    onKeyDown={handleKeyDown}
-                    onStop={stop}
-                    onSubmit={handleSubmit}
-                    placeholder="Sigue preguntando sobre la economia venezolana..."
-                    textareaRef={textareaRef}
-                    variant="hero"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          </main>
         </div>
-      )}
+      </div>
     </>
   );
 }

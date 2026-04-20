@@ -1,6 +1,6 @@
 COMPOSE = docker compose --env-file .env
 
-.PHONY: up down status logs restart clean
+.PHONY: up down status logs restart clean ingest ingest-local build-raw-knowledge
 
 up:
 	$(COMPOSE) up -d --build
@@ -20,3 +20,12 @@ restart:
 
 clean:
 	$(COMPOSE) down -v --remove-orphans
+
+ingest:
+	$(COMPOSE) exec api node src/scripts/ingest-knowledge.js
+
+ingest-local:
+	cd backend && npm run ingest
+
+build-raw-knowledge:
+	cd backend && npm run build:raw-knowledge

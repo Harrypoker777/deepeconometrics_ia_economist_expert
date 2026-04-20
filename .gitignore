@@ -18,6 +18,9 @@ pib/*.csv
 pib/*.ipynb
 pib/*.txt
 tablas_economic_base/
+knowledge/raw_knowledge/*.pdf
+knowledge/pensamiento/book-economic-thoght/
+logo_deepeconometrics.png
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
