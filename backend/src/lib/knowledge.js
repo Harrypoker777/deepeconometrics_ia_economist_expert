@@ -2,15 +2,21 @@ import { randomUUID } from 'node:crypto';
 import { query } from '../db.js';
 import { embedBatch, embedText, toPgVector } from './embeddings.js';
 
+let vectorExtensionPromise = null;
+
 export async function hasVectorExtension() {
-  try {
-    const result = await query(
+  if (!vectorExtensionPromise) {
+    vectorExtensionPromise = query(
       `SELECT 1 FROM pg_extension WHERE extname = 'vector' LIMIT 1`
-    );
-    return result.rows.length > 0;
-  } catch {
-    return false;
+    )
+      .then((result) => result.rows.length > 0)
+      .catch(() => false);
   }
+  return vectorExtensionPromise;
+}
+
+export function resetVectorExtensionCache() {
+  vectorExtensionPromise = null;
 }
 
 function buildChunkHash(slug, chunkIndex, content) {
@@ -356,35 +362,37 @@ export async function searchKnowledge({ q, limit = 6, category = null }) {
     const categoryFilter = category ? 'AND d.category = $3' : '';
     if (category) params.push(category);
 
-    const result = await query(
-      `
-        SELECT
-          c.id AS chunk_id,
-          c.chunk_index,
-          c.content,
-          d.slug,
-          d.title,
-          d.category,
-          d.source,
-          d.author,
-          d.tags,
-          1 - (c.embedding <=> $1::vector) AS similarity
-        FROM kb_chunks c
-        JOIN kb_documents d ON d.id = c.document_id
-        WHERE c.embedding IS NOT NULL ${categoryFilter}
-        ORDER BY c.embedding <=> $1::vector
-        LIMIT $2
-      `,
-      params
-    );
-    const lexicalRows = await queryLexicalKnowledgeRows({
-      patterns: ilikePatterns,
-      limit: candidateLimit,
-      category,
-    });
+    const [vectorResult, lexicalRows] = await Promise.all([
+      query(
+        `
+          SELECT
+            c.id AS chunk_id,
+            c.chunk_index,
+            c.content,
+            d.slug,
+            d.title,
+            d.category,
+            d.source,
+            d.author,
+            d.tags,
+            1 - (c.embedding <=> $1::vector) AS similarity
+          FROM kb_chunks c
+          JOIN kb_documents d ON d.id = c.document_id
+          WHERE c.embedding IS NOT NULL ${categoryFilter}
+          ORDER BY c.embedding <=> $1::vector
+          LIMIT $2
+        `,
+        params
+      ),
+      queryLexicalKnowledgeRows({
+        patterns: ilikePatterns,
+        limit: candidateLimit,
+        category,
+      }),
+    ]);
 
     return rerankKnowledgeRows(
-      mergeKnowledgeRows(result.rows, lexicalRows),
+      mergeKnowledgeRows(vectorResult.rows, lexicalRows),
       cleanQuery,
       limit
     );

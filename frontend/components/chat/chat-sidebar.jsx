@@ -12,6 +12,7 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
+import { DeepEconometricsLogo } from '@/components/brand/deepeconometrics-logo';
 import { Button } from '@/components/ui/button';
 
 function SettingsMenu({ collapsed, onClearHistory, onLogout, onOpenAccount }) {
@@ -73,9 +74,6 @@ function SessionRow({ active, onDelete, onSelect, title }) {
           <span className="block truncate text-sm font-medium">
             {title}
           </span>
-          <span className="mt-1 block text-xs text-muted-foreground">
-            Conversacion guardada
-          </span>
         </span>
       </button>
 
@@ -91,21 +89,16 @@ function SessionRow({ active, onDelete, onSelect, title }) {
   );
 }
 
-function BrandBlock({ subtitle }) {
+function BrandBlock() {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-        <span className="text-sm font-semibold tracking-[0.18em]">
-          DE
-        </span>
+      <div className="flex h-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/78 px-2">
+        <DeepEconometricsLogo className="h-6 w-auto" />
       </div>
 
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-foreground">
           DeepEconometrics
-        </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {subtitle}
         </p>
       </div>
     </div>
@@ -147,10 +140,8 @@ export function ChatSidebar({
   if (collapsed) {
     return (
       <aside className="sidebar-panel panel-surface relative hidden w-[4.75rem] shrink-0 flex-col items-center rounded-[1.7rem] p-3 md:flex">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-          <span className="text-sm font-semibold tracking-[0.18em]">
-            DE
-          </span>
+        <div className="flex h-10 items-center justify-center rounded-2xl border border-border/70 bg-background/78 px-2">
+          <DeepEconometricsLogo className="h-5 w-auto" />
         </div>
 
         <button
@@ -211,7 +202,7 @@ export function ChatSidebar({
     <aside className="sidebar-panel panel-surface hidden w-[17.75rem] shrink-0 flex-col rounded-[1.9rem] p-3 md:flex">
       <div className="rounded-[1.35rem] border border-border/80 bg-background/75 p-3">
         <div className="flex items-start justify-between gap-3">
-          <BrandBlock subtitle={isAuthenticated ? 'Workspace con memoria' : 'Modo temporal'} />
+          <BrandBlock />
 
           <button
             type="button"
@@ -236,9 +227,9 @@ export function ChatSidebar({
 
       <div className="mt-4 flex items-center justify-between px-1">
         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Conversaciones
+          Historial
         </p>
-        <span className="rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+        <span className="text-[11px] text-muted-foreground">
           {isAuthenticated ? sessions.length : 'Temp'}
         </span>
       </div>

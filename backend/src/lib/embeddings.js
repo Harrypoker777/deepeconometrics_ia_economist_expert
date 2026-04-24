@@ -3,6 +3,24 @@ import { config } from '../config.js';
 export const EMBEDDING_MODEL = 'text-embedding-3-small';
 export const EMBEDDING_DIMENSIONS = 1536;
 
+const EMBEDDING_CACHE_LIMIT = 256;
+const embeddingCache = new Map();
+
+function normalizeCacheKey(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function rememberEmbedding(key, vector) {
+  if (embeddingCache.has(key)) {
+    embeddingCache.delete(key);
+  }
+  embeddingCache.set(key, vector);
+  if (embeddingCache.size > EMBEDDING_CACHE_LIMIT) {
+    const oldestKey = embeddingCache.keys().next().value;
+    if (oldestKey !== undefined) embeddingCache.delete(oldestKey);
+  }
+}
+
 export class EmbeddingError extends Error {
   constructor(message, cause) {
     super(message);
@@ -16,7 +34,19 @@ export function hasEmbeddingProvider() {
 }
 
 export async function embedText(input) {
-  return (await embedBatch([input]))[0];
+  const key = normalizeCacheKey(input);
+  if (key && embeddingCache.has(key)) {
+    const cached = embeddingCache.get(key);
+    embeddingCache.delete(key);
+    embeddingCache.set(key, cached);
+    return cached;
+  }
+
+  const [vector] = await embedBatch([input]);
+  if (key && vector) {
+    rememberEmbedding(key, vector);
+  }
+  return vector;
 }
 
 export async function embedBatch(inputs) {

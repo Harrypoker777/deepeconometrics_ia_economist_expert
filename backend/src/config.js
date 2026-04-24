@@ -13,6 +13,8 @@ export const config = {
   allowedOrigin: process.env.ALLOWED_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
   apiSecret: process.env.API_SECRET || '',
   openaiApiKey: process.env.OPENAI_API_KEY || '',
+  chatTimeoutMs: Number(process.env.CHAT_TIMEOUT_MS || 90000),
+  externalSourceTimeoutMs: Number(process.env.EXTERNAL_SOURCE_TIMEOUT_MS || 15000),
   db: {
     host: process.env.DB_HOST || 'localhost',
     port: Number(process.env.DB_PORT || 5432),

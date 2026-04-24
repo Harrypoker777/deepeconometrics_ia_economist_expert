@@ -4,67 +4,67 @@
 
 @layer base {
   :root {
-    --background: 220 23% 98%;
-    --foreground: 222 22% 11%;
+    --background: 42 24% 98%;
+    --foreground: 224 21% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222 22% 11%;
-    --primary: 222 46% 11%;
+    --card-foreground: 224 21% 11%;
+    --primary: 224 21% 11%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 220 18% 95%;
-    --secondary-foreground: 222 22% 12%;
-    --accent: 201 70% 56%;
-    --accent-foreground: 210 40% 98%;
-    --accent-soft: 202 80% 95%;
-    --accent-strong: 201 54% 36%;
-    --muted: 220 16% 96%;
-    --muted-foreground: 220 9% 43%;
-    --border: 220 15% 88%;
-    --input: 220 16% 92%;
-    --ring: 201 70% 56%;
-    --user-bubble: 220 20% 94%;
-    --sidebar: 220 20% 99%;
+    --secondary: 44 42% 95%;
+    --secondary-foreground: 224 21% 12%;
+    --accent: 46 99% 51%;
+    --accent-foreground: 224 21% 11%;
+    --accent-soft: 46 100% 96%;
+    --accent-strong: 42 88% 38%;
+    --muted: 42 14% 96%;
+    --muted-foreground: 224 8% 42%;
+    --border: 42 14% 87%;
+    --input: 42 14% 92%;
+    --ring: 46 99% 51%;
+    --user-bubble: 44 38% 94%;
+    --sidebar: 42 19% 99%;
     --surface: 0 0% 100%;
-    --surface-strong: 220 20% 98%;
+    --surface-strong: 42 18% 98%;
     --elevated: 0 0% 100%;
     --panel: 0 0% 100%;
-    --panel-foreground: 222 22% 11%;
-    --hero: 220 23% 99%;
-    --hero-foreground: 222 22% 11%;
-    --grid: 220 18% 90%;
-    --spotlight: 201 78% 58%;
-    --shadow: 222 28% 12%;
+    --panel-foreground: 224 21% 11%;
+    --hero: 42 22% 99%;
+    --hero-foreground: 224 21% 11%;
+    --grid: 42 18% 90%;
+    --spotlight: 46 99% 51%;
+    --shadow: 224 24% 12%;
   }
 
   .dark {
-    --background: 220 18% 8%;
+    --background: 225 18% 7%;
     --foreground: 210 18% 96%;
-    --card: 220 15% 11%;
+    --card: 225 15% 10%;
     --card-foreground: 210 18% 96%;
     --primary: 210 16% 96%;
-    --primary-foreground: 220 18% 10%;
-    --secondary: 220 14% 14%;
+    --primary-foreground: 225 18% 10%;
+    --secondary: 42 24% 12%;
     --secondary-foreground: 210 18% 95%;
-    --accent: 199 79% 63%;
-    --accent-foreground: 220 18% 10%;
-    --accent-soft: 203 48% 16%;
-    --accent-strong: 199 68% 74%;
-    --muted: 220 14% 13%;
-    --muted-foreground: 216 10% 67%;
-    --border: 220 14% 18%;
-    --input: 220 14% 16%;
-    --ring: 199 79% 63%;
-    --user-bubble: 220 14% 15%;
-    --sidebar: 220 16% 10%;
-    --surface: 220 14% 11%;
-    --surface-strong: 220 15% 12%;
-    --elevated: 220 14% 12%;
-    --panel: 220 14% 10%;
+    --accent: 46 99% 56%;
+    --accent-foreground: 225 18% 10%;
+    --accent-soft: 46 42% 14%;
+    --accent-strong: 46 98% 72%;
+    --muted: 225 12% 12%;
+    --muted-foreground: 220 9% 66%;
+    --border: 225 11% 18%;
+    --input: 225 11% 15%;
+    --ring: 46 99% 56%;
+    --user-bubble: 225 12% 14%;
+    --sidebar: 225 14% 9%;
+    --surface: 225 14% 10%;
+    --surface-strong: 225 13% 11%;
+    --elevated: 225 13% 11%;
+    --panel: 225 14% 9%;
     --panel-foreground: 210 18% 96%;
-    --hero: 220 16% 9%;
+    --hero: 225 16% 8%;
     --hero-foreground: 210 18% 96%;
-    --grid: 220 14% 17%;
-    --spotlight: 199 79% 63%;
-    --shadow: 220 40% 2%;
+    --grid: 225 11% 16%;
+    --spotlight: 46 99% 56%;
+    --shadow: 225 40% 2%;
   }
 
   * {
@@ -85,7 +85,7 @@
     margin: 0;
     min-height: 100vh;
     background:
-      radial-gradient(circle at top, hsl(var(--spotlight) / 0.08), transparent 28%),
+      radial-gradient(circle at top, hsl(var(--spotlight) / 0.08), transparent 24%),
       linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
     color: hsl(var(--foreground));
     font-feature-settings: 'ss01' on, 'cv11' on, 'cv02' on;
@@ -99,9 +99,12 @@
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(circle at 14% 18%, hsl(var(--spotlight) / 0.08), transparent 18%),
-      radial-gradient(circle at 86% 12%, hsl(var(--spotlight) / 0.05), transparent 18%);
-    opacity: 0.9;
+      radial-gradient(circle at 18% 14%, hsl(var(--spotlight) / 0.06), transparent 16%),
+      radial-gradient(circle at 84% 12%, hsl(var(--spotlight) / 0.04), transparent 18%);
+    opacity: 0.85;
+    transform: translateZ(0);
+    will-change: transform;
+    z-index: -1;
   }
 
   ::selection {
@@ -118,11 +121,9 @@
 
   .panel-surface {
     border: 1px solid hsl(var(--border) / 0.88);
-    background: hsl(var(--panel) / 0.9);
+    background: hsl(var(--panel) / 0.96);
     color: hsl(var(--panel-foreground));
-    box-shadow: 0 10px 40px hsl(var(--shadow) / 0.1);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 10px 34px hsl(var(--shadow) / 0.08);
   }
 
   .hero-panel {
@@ -142,17 +143,15 @@
   }
 
   .topbar-surface {
-    background: linear-gradient(180deg, hsl(var(--panel) / 0.98), hsl(var(--panel) / 0.92));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: linear-gradient(180deg, hsl(var(--panel) / 0.98), hsl(var(--panel) / 0.96));
   }
 
   .composer-shell {
     border: 1px solid hsl(var(--border) / 0.9);
-    background: linear-gradient(180deg, hsl(var(--surface) / 0.98), hsl(var(--surface-strong) / 0.94));
-    box-shadow: 0 12px 28px hsl(var(--shadow) / 0.12);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: linear-gradient(180deg, hsl(var(--surface) / 0.98), hsl(var(--surface-strong) / 0.96));
+    box-shadow:
+      0 16px 40px hsl(var(--shadow) / 0.12),
+      0 0 0 1px hsl(var(--spotlight) / 0.06);
   }
 
   .rail-card {
@@ -220,9 +219,7 @@
   }
 
   .glass-surface {
-    background: hsl(var(--surface) / 0.72);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: hsl(var(--surface) / 0.85);
   }
 
   .prose-deep {
@@ -245,6 +242,17 @@
   .prose-deep pre,
   .prose-deep code {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .prose-deep .katex {
+    color: hsl(var(--foreground));
+  }
+
+  .prose-deep .katex-display {
+    margin: 1rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25rem 0.1rem;
   }
 
   .shimmer {

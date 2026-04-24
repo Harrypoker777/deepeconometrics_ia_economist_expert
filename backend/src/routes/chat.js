@@ -9,7 +9,7 @@ import {
 import { config } from '../config.js';
 import { getRequestAuth } from '../lib/auth.js';
 import { checkApiSecret } from '../lib/check-api-secret.js';
-import { saveSessionSnapshot } from '../lib/sessions.js';
+import { ensureSessionOwnership, saveSessionSnapshot } from '../lib/sessions.js';
 import { SYSTEM_PROMPT } from '../system-prompt.js';
 import { createEconomicTools } from '../tools/index.js';
 
@@ -38,25 +38,39 @@ export async function registerChatRoute(fastify) {
       return reply.code(400).send({ error: 'messages[] is required.' });
     }
 
-    try {
-      if (persistSession) {
-        await saveSessionSnapshot({
-          sessionId,
-          userId,
-          messages,
-        });
+    if (persistSession) {
+      try {
+        const owned = await ensureSessionOwnership({ sessionId, userId });
+        if (!owned) {
+          return reply.code(403).send({ error: 'No puedes escribir en esta sesion.' });
+        }
+      } catch (error) {
+        request.log.error(error, 'Failed to authorize session before streaming');
+        return reply.code(500).send({ error: 'No se pudo autorizar la sesion.' });
       }
-    } catch (error) {
-      request.log.error(error, 'Failed to persist the session before streaming');
-      return reply.code(403).send({ error: 'No puedes escribir en esta sesion.' });
+
+      saveSessionSnapshot({ sessionId, userId, messages }).catch((error) => {
+        request.log.error(error, 'Background pre-stream snapshot failed');
+      });
     }
 
     const abortController = new AbortController();
+    const clearChatTimeout = (() => {
+      const timeoutId = setTimeout(() => {
+        request.log.warn({ timeoutMs: config.chatTimeoutMs }, 'Chat request timed out');
+        abortController.abort(new Error('CHAT_TIMEOUT'));
+      }, config.chatTimeoutMs);
+
+      return () => clearTimeout(timeoutId);
+    })();
+
     request.raw.on('close', () => {
       if (request.raw.aborted) {
-        abortController.abort();
+        abortController.abort(new Error('CLIENT_DISCONNECTED'));
       }
+      clearChatTimeout();
     });
+    reply.raw.on('finish', clearChatTimeout);
 
     const tools = createEconomicTools({
       queryClient: fastify.pgQuery,
@@ -128,6 +142,9 @@ export async function registerChatRoute(fastify) {
         },
         onError: (error) => {
           request.log.error(error);
+          if (abortController.signal.aborted && abortController.signal.reason?.message === 'CHAT_TIMEOUT') {
+            return 'La consulta supero el tiempo limite del servicio. Intenta una pregunta mas acotada o vuelve a intentarlo.';
+          }
           return error instanceof Error ? error.message : 'Unexpected streaming error';
         },
       }),

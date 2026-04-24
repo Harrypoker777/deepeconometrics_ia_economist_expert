@@ -1,5 +1,25 @@
 import { query } from '../db.js';
 
+export async function ensureSessionOwnership({ sessionId, userId }) {
+  if (!sessionId || !userId) {
+    return false;
+  }
+
+  const result = await query(
+    `
+      INSERT INTO sesiones (session_id, perfil_usuario_id, messages)
+      VALUES ($1, $2, '[]'::jsonb)
+      ON CONFLICT (session_id)
+      DO UPDATE SET updated_at = now()
+      WHERE sesiones.perfil_usuario_id = EXCLUDED.perfil_usuario_id
+      RETURNING session_id
+    `,
+    [sessionId, userId]
+  );
+
+  return result.rowCount > 0;
+}
+
 export async function saveSessionSnapshot({ sessionId, userId, messages }) {
   if (!sessionId || !userId) {
     return null;

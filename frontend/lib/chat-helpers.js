@@ -1,5 +1,65 @@
 const chartBlockPattern = /```json\s*([\s\S]*?)```/gi;
 const urlPattern = /https?:\/\/[^\s)]+/gi;
+const fencedBlockPattern = /(```[\s\S]*?```)/g;
+const latexDisplayPattern = /\\\[\s*([\s\S]*?)\s*\\\]/g;
+const latexInlinePattern = /\\\(\s*([\s\S]*?)\s*\\\)/g;
+const bracketMathPattern =
+  /\[\s*((?=[^\]]*\\(?:text|frac|left|right|times|approx|cdot|sum|prod|int|sqrt|alpha|beta|gamma|delta|pi|theta|lambda|mu|sigma|Delta|mathrm|operatorname|begin|end))[^\]]+?)\s*\](?!\()/g;
+const seriesKeyPattern = /"series"\s*:/;
+const chartArtifactCache = new WeakMap();
+
+function getMessageParts(message) {
+  if (Array.isArray(message?.parts)) {
+    return message.parts;
+  }
+
+  if (typeof message?.content === 'string') {
+    return [{ type: 'text', text: message.content }];
+  }
+
+  return [];
+}
+
+function createFallbackMessageId(message, index) {
+  const role =
+    typeof message?.role === 'string' && message.role.trim()
+      ? message.role.trim()
+      : 'message';
+
+  return `${role}-${index + 1}`;
+}
+
+export function normalizeUiMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return [];
+  }
+
+  const seenIds = new Map();
+  let changed = false;
+
+  const normalizedMessages = messages.map((message, index) => {
+    const parts = getMessageParts(message);
+    const rawId = typeof message?.id === 'string' ? message.id.trim() : '';
+    const baseId = rawId || createFallbackMessageId(message, index);
+    const duplicateCount = seenIds.get(baseId) || 0;
+    const nextId = duplicateCount === 0 ? baseId : `${baseId}-${duplicateCount + 1}`;
+
+    seenIds.set(baseId, duplicateCount + 1);
+
+    if (nextId !== message?.id || parts !== message?.parts) {
+      changed = true;
+      return {
+        ...message,
+        id: nextId,
+        parts,
+      };
+    }
+
+    return message;
+  });
+
+  return changed ? normalizedMessages : messages;
+}
 
 export const INDICATOR_PROMPTS = [
   {
@@ -55,15 +115,184 @@ function tryParseChartObject(candidate) {
   };
 }
 
+function splitByFencedBlocks(text) {
+  const segments = [];
+  let lastIndex = 0;
+
+  fencedBlockPattern.lastIndex = 0;
+  let match = fencedBlockPattern.exec(text);
+
+  while (match) {
+    if (match.index > lastIndex) {
+      segments.push({
+        text: text.slice(lastIndex, match.index),
+        code: false,
+        offset: lastIndex,
+      });
+    }
+
+    segments.push({
+      text: match[0],
+      code: true,
+      offset: match.index,
+    });
+
+    lastIndex = match.index + match[0].length;
+    match = fencedBlockPattern.exec(text);
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({
+      text: text.slice(lastIndex),
+      code: false,
+      offset: lastIndex,
+    });
+  }
+
+  fencedBlockPattern.lastIndex = 0;
+
+  return segments;
+}
+
+function findRawChartObjectsInSegment(text, baseOffset = 0) {
+  const matches = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const start = text.indexOf('{', cursor);
+    if (start === -1) break;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = -1;
+
+    for (let index = start; index < text.length; index += 1) {
+      const character = text[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+
+        if (character === '\\') {
+          escaped = true;
+          continue;
+        }
+
+        if (character === '"') {
+          inString = false;
+        }
+
+        continue;
+      }
+
+      if (character === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (character === '{') {
+        depth += 1;
+        continue;
+      }
+
+      if (character === '}') {
+        depth -= 1;
+
+        if (depth === 0) {
+          end = index;
+          break;
+        }
+      }
+    }
+
+    if (end === -1) {
+      break;
+    }
+
+    const candidate = text.slice(start, end + 1);
+    let chart = null;
+
+    if (seriesKeyPattern.test(candidate)) {
+      try {
+        chart = tryParseChartObject(JSON.parse(candidate));
+      } catch {
+        chart = null;
+      }
+    }
+
+    seriesKeyPattern.lastIndex = 0;
+
+    if (chart) {
+      matches.push({
+        start: baseOffset + start,
+        end: baseOffset + end + 1,
+        chart,
+      });
+      cursor = end + 1;
+      continue;
+    }
+
+    cursor = start + 1;
+  }
+
+  return matches;
+}
+
+function findRawChartObjects(text) {
+  const matches = [];
+
+  for (const segment of splitByFencedBlocks(text)) {
+    if (segment.code) continue;
+    matches.push(...findRawChartObjectsInSegment(segment.text, segment.offset));
+  }
+
+  return matches;
+}
+
+function stripTextRanges(text, ranges) {
+  if (ranges.length === 0) return text;
+
+  return [...ranges]
+    .sort((left, right) => right.start - left.start)
+    .reduce(
+      (current, range) => current.slice(0, range.start) + current.slice(range.end),
+      text
+    );
+}
+
+function createChartArtifactAnchor(messageId, index) {
+  const safeMessageId = String(messageId || 'message').replace(/[^a-zA-Z0-9_-]/g, '-');
+  return `result-${safeMessageId}-${index + 1}`;
+}
+
+function normalizeVisibleText(text) {
+  return text
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+\n/g, '\n\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function hasPotentialChartPayload(text) {
+  return Boolean(text) && (
+    text.includes('"series"') ||
+    text.includes('```json') ||
+    text.includes('"chart"')
+  );
+}
+
 export function getMessageText(message) {
-  return message.parts
+  return getMessageParts(message)
     .filter((part) => part.type === 'text')
     .map((part) => part.text)
     .join('');
 }
 
 export function getReasoningText(message) {
-  return message.parts
+  return getMessageParts(message)
     .filter((part) => part.type === 'reasoning')
     .map((part) => part.text || part.reasoning || '')
     .join('\n')
@@ -71,7 +300,13 @@ export function getReasoningText(message) {
 }
 
 export function stripChartBlocks(text) {
-  return text
+  if (!text) return '';
+
+  if (!hasPotentialChartPayload(text)) {
+    return normalizeVisibleText(text);
+  }
+
+  const withoutFencedCharts = text
     .replace(chartBlockPattern, (block, rawJson) => {
       try {
         const parsed = JSON.parse(rawJson);
@@ -79,15 +314,64 @@ export function stripChartBlocks(text) {
       } catch {
         return block;
       }
-    })
+    });
+
+  const rawChartObjects = findRawChartObjects(withoutFencedCharts);
+  const cleaned = stripTextRanges(
+    withoutFencedCharts,
+    rawChartObjects.map((item) => ({ start: item.start, end: item.end }))
+  );
+
+  return normalizeVisibleText(cleaned);
+}
+
+function normalizeMathContent(content) {
+  return content
+    .replace(/(^|[^\\])%/g, '$1\\%')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+function wrapDisplayMath(content) {
+  const normalized = normalizeMathContent(content);
+  return normalized ? `\n\n$$\n${normalized}\n$$\n\n` : '';
+}
+
+function wrapInlineMath(content) {
+  const normalized = normalizeMathContent(content);
+  return normalized ? `$${normalized}$` : '';
+}
+
+function normalizeMathInSegment(segment) {
+  return segment
+    .replace(latexDisplayPattern, (_, content) => wrapDisplayMath(content))
+    .replace(latexInlinePattern, (_, content) => wrapInlineMath(content))
+    .replace(bracketMathPattern, (_, content) => wrapDisplayMath(content))
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+export function formatAssistantMarkdown(text) {
+  if (!text) return '';
+
+  return text
+    .split(fencedBlockPattern)
+    .map((segment) => (
+      segment.startsWith('```') ? segment : normalizeMathInSegment(segment)
+    ))
+    .join('')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
-export function findChartsInMessage(message) {
+export function findChartArtifactsInMessage(message) {
   if (!message || message.role !== 'assistant') return [];
 
-  const charts = [];
+  const cached = chartArtifactCache.get(message);
+  if (cached) {
+    return cached;
+  }
+
+  const artifacts = [];
   const seen = new Set();
 
   function push(chart) {
@@ -95,10 +379,15 @@ export function findChartsInMessage(message) {
     const key = `${chart.title}|${chart.series.length}|${chart.series[0]?.label}|${chart.series[0]?.value}`;
     if (seen.has(key)) return;
     seen.add(key);
-    charts.push(chart);
+    artifacts.push({
+      anchorId: createChartArtifactAnchor(message.id, artifacts.length),
+      chart,
+      messageId: message.id,
+      resultType: 'chart',
+    });
   }
 
-  for (const part of message.parts || []) {
+  for (const part of getMessageParts(message)) {
     if (part.type === 'tool-generate_forecast' && part.state === 'output-available') {
       push(
         tryParseChartObject({
@@ -115,6 +404,11 @@ export function findChartsInMessage(message) {
   }
 
   const text = getMessageText(message);
+  if (!hasPotentialChartPayload(text)) {
+    chartArtifactCache.set(message, artifacts);
+    return artifacts;
+  }
+
   chartBlockPattern.lastIndex = 0;
   let match = chartBlockPattern.exec(text);
 
@@ -130,7 +424,31 @@ export function findChartsInMessage(message) {
 
   chartBlockPattern.lastIndex = 0;
 
-  return charts;
+  for (const item of findRawChartObjects(text)) {
+    push(item.chart);
+  }
+
+  chartArtifactCache.set(message, artifacts);
+  return artifacts;
+}
+
+export function findChartsInMessage(message) {
+  return findChartArtifactsInMessage(message).map((artifact) => artifact.chart);
+}
+
+export function extractConversationArtifacts(messages) {
+  const artifacts = [];
+
+  for (const message of messages || []) {
+    for (const artifact of findChartArtifactsInMessage(message)) {
+      artifacts.push({
+        ...artifact,
+        order: artifacts.length + 1,
+      });
+    }
+  }
+
+  return artifacts;
 }
 
 function detectDownloadKind(url, fallbackKind) {
@@ -151,7 +469,7 @@ export function findDownloadsInMessage(message) {
 
   const map = new Map();
 
-  for (const part of message.parts || []) {
+  for (const part of getMessageParts(message)) {
     if (part.type === 'file' && part.url) {
       const kind = detectDownloadKind(part.url);
       map.set(part.url, { url: part.url, kind, label: labelForKind(kind) });
@@ -222,7 +540,7 @@ export function getActiveToolInvocations(messages) {
   const lastAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
   if (!lastAssistant) return [];
 
-  return lastAssistant.parts
+  return getMessageParts(lastAssistant)
     .filter((part) => part.type.startsWith('tool-'))
     .filter((part) => part.state === 'input-streaming' || part.state === 'input-available')
     .map((part) => humanizeToolPart(part.type));

@@ -55,6 +55,8 @@ Contrasena: Alijesus1*
 
 - `.env`: configura Docker y el backend.
 - `frontend/.env.example`: variables que debes cargar en Vercel o en local para Next.js.
+- `CHAT_TIMEOUT_MS`: tiempo maximo del stream de chat antes de abortar con error controlado.
+- `EXTERNAL_SOURCE_TIMEOUT_MS`: tiempo maximo por request a fuentes externas como World Bank, IMF o ECB.
 
 ## Versionado recomendado
 

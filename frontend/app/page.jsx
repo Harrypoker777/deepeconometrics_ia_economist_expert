@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
-import { CheckCircle2, CircleAlert, LoaderCircle, LogIn, Plus, Sparkles } from 'lucide-react';
+import { CircleAlert, LoaderCircle, LogIn, Plus } from 'lucide-react';
 import { AuthDialog } from '@/components/auth/auth-dialog';
+import { DeepEconometricsLogo } from '@/components/brand/deepeconometrics-logo';
 import { AccountDialog } from '@/components/chat/account-dialog';
 import { ChatComposer } from '@/components/chat/chat-composer';
 import { ChatRightRail } from '@/components/chat/chat-right-rail';
@@ -14,12 +15,7 @@ import { PromptSuggestions } from '@/components/chat/prompt-suggestions';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Button } from '@/components/ui/button';
 import { apiFetch, createChatTransport } from '@/lib/api';
-
-const EMPTY_STATE_POINTS = [
-  'Chat-first workspace',
-  'RAG economico',
-  'Forecast y exports',
-];
+import { extractConversationArtifacts, normalizeUiMessages } from '@/lib/chat-helpers';
 
 function createSessionId() {
   return crypto.randomUUID();
@@ -29,131 +25,77 @@ function getUserSessionStorageKey(userId) {
   return `deepeconometrics.user-session:${userId}`;
 }
 
-function EmptyWorkspace({ isAuthenticated, onOpenAuth, onSelectPrompt }) {
+function EmptyWorkspace() {
   return (
-    <div className="flex min-h-[48vh] flex-col items-center justify-center py-8 text-center sm:min-h-[54vh]">
-      <div className="flex size-14 items-center justify-center rounded-[1.35rem] bg-secondary/80 text-foreground shadow-soft">
-        <Sparkles className="size-6" />
+    <div className="flex min-h-[36vh] flex-col items-center justify-end pb-8 pt-8 text-center sm:min-h-[44vh] sm:pb-12">
+      <div className="flex items-center justify-center rounded-[1.7rem] border border-border/70 bg-background/68 px-5 py-3">
+        <DeepEconometricsLogo className="h-12 w-auto sm:h-14" />
       </div>
 
-      <p className="mt-6 text-sm font-medium text-muted-foreground">
-        DeepEconometrics workspace
-      </p>
-
-      <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-foreground sm:text-5xl">
-        Pregunta por datos, teoria o pronosticos sin salir del chat.
+      <h1 className="mt-7 max-w-3xl text-4xl font-semibold tracking-[-0.065em] text-foreground sm:text-5xl">
+        ¿Que quieres analizar hoy?
       </h1>
 
-      <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground sm:text-[15px]">
-        Interfaz minimal, modo oscuro por defecto y flujo unificado para indicadores,
-        conocimiento economico, scraping y dashboards.
+      <p className="mt-4 max-w-lg text-sm leading-7 text-muted-foreground sm:text-[15px]">
+        Datos, teoria economica, scraping y pronosticos en una interfaz limpia y centrada.
       </p>
-
-      <div className="mt-6 flex flex-wrap justify-center gap-2">
-        {EMPTY_STATE_POINTS.map((item) => (
-          <span key={item} className="status-pill">
-            <span className="dot-pulse" />
-            {item}
-          </span>
-        ))}
-      </div>
-
-      {!isAuthenticated && (
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-6 rounded-full px-5"
-          onClick={onOpenAuth}
-        >
-          <LogIn className="size-4" />
-          Iniciar sesion
-        </Button>
-      )}
-
-      <div className="mt-10 w-full max-w-4xl">
-        <PromptSuggestions
-          variant="compact"
-          onSelect={(prompt) => {
-            void onSelectPrompt(prompt);
-          }}
-        />
-      </div>
     </div>
   );
 }
 
-function WorkspaceTopbar({
-  busy,
-  currentTitle,
-  error,
-  isAuthenticated,
-  isEmpty,
-  onNewChat,
-  onOpenAuth,
-}) {
-  const stateLabel = busy ? 'Thinking' : error ? 'Error' : 'Ready';
-  const subtitle = isEmpty
-    ? isAuthenticated
-      ? 'Nuevo chat listo para guardar contexto, activar tools y seguir sesiones.'
-      : 'Sesion temporal lista para consultar RAG, indicadores o forecasts.'
-    : busy
-      ? 'El agente esta consultando herramientas, datos y base de conocimiento.'
-      : 'Workspace listo para continuar la conversacion o abrir un nuevo analisis.';
+function AnonymousTopbar({ hasConversation, onNewChat, onOpenAuth }) {
+  return (
+    <header className="px-1 py-3 sm:py-4">
+      <div className="flex items-center justify-between gap-3">
+        <DeepEconometricsLogo className="h-10 w-auto sm:h-11" />
 
+        <div className="flex items-center gap-2">
+          {hasConversation && (
+            <Button type="button" variant="ghost" onClick={onNewChat}>
+              <Plus className="size-4" />
+              Nuevo chat
+            </Button>
+          )}
+          <Button type="button" variant="ghost" onClick={onOpenAuth}>
+            <LogIn className="size-4" />
+            Iniciar sesion
+          </Button>
+          <ModeToggle />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function WorkspaceTopbar({ busy, currentTitle, error, onNewChat }) {
   return (
     <header className="topbar-surface border-b border-border/75 px-4 py-4 sm:px-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="eyebrow">
-              OpenAI-inspired workspace
-            </span>
-
-            {error && (
-              <span className="status-pill text-red-400">
-                <CircleAlert className="size-3.5" />
-                Needs attention
-              </span>
-            )}
-          </div>
-
-          <p className="mt-3 text-sm font-medium text-muted-foreground">
+          <p className="text-sm font-medium text-muted-foreground">
             DeepEconometrics
           </p>
 
-          <h2 className="mt-1 truncate text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
-            {currentTitle}
-          </h2>
+          <div className="mt-1 flex items-center gap-2">
+            <h2 className="truncate text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
+              {currentTitle}
+            </h2>
 
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {subtitle}
-          </p>
+            {busy && (
+              <LoaderCircle className="size-4 shrink-0 animate-spin text-accent-strong" />
+            )}
+
+            {error && (
+              <CircleAlert className="size-4 shrink-0 text-red-400" />
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="status-pill">
-            {error ? (
-              <CircleAlert className="size-3.5 text-red-400" />
-            ) : busy ? (
-              <LoaderCircle className="size-3.5 animate-spin text-accent-strong" />
-            ) : (
-              <CheckCircle2 className="size-3.5 text-accent-strong" />
-            )}
-            {stateLabel}
-          </span>
-
           <Button type="button" variant="ghost" onClick={onNewChat}>
             <Plus className="size-4" />
             Nuevo chat
           </Button>
-
-          {!isAuthenticated && (
-            <Button type="button" variant="outline" onClick={onOpenAuth}>
-              <LogIn className="size-4" />
-              Iniciar sesion
-            </Button>
-          )}
-
           <ModeToggle />
         </div>
       </div>
@@ -171,7 +113,9 @@ export default function HomePage() {
   const [showAccountDialog, setShowAccountDialog] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const scrollRef = useRef(null);
+  const scrollFrameRef = useRef(0);
   const textareaRef = useRef(null);
+  const stickToBottomRef = useRef(true);
   const requestBodyRef = useRef({
     sessionId: '',
     persist: false,
@@ -228,8 +172,19 @@ export default function HomePage() {
 
   const busy = status === 'submitted' || status === 'streaming';
   const isAuthenticated = Boolean(authUser);
-  const isEmpty = messages.length === 0;
-  const currentSession = sessions.find((session) => session.sessionId === sessionId) || null;
+  const displayMessages = useMemo(
+    () => normalizeUiMessages(messages),
+    [messages]
+  );
+  const isEmpty = displayMessages.length === 0;
+  const currentSession = useMemo(
+    () => sessions.find((session) => session.sessionId === sessionId) || null,
+    [sessionId, sessions]
+  );
+  const sessionArtifacts = useMemo(
+    () => extractConversationArtifacts(displayMessages),
+    [displayMessages]
+  );
 
   const startAnonymousWorkspace = useCallback(() => {
     setSessions([]);
@@ -280,7 +235,7 @@ export default function HomePage() {
         getUserSessionStorageKey(authUser.id),
         nextSessionId
       );
-      setMessages(data.messages || []);
+      setMessages(normalizeUiMessages(data.messages || []));
       setDraft('');
     } catch {
       setMessages([]);
@@ -315,10 +270,41 @@ export default function HomePage() {
   ]);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (!stickToBottomRef.current || !scrollRef.current) {
+      return undefined;
     }
+
+    if (scrollFrameRef.current) {
+      cancelAnimationFrame(scrollFrameRef.current);
+    }
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      const node = scrollRef.current;
+      if (!node) return;
+
+      node.scrollTop = node.scrollHeight;
+      scrollFrameRef.current = 0;
+    });
+
+    return () => {
+      if (scrollFrameRef.current) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = 0;
+      }
+    };
   }, [messages, status]);
+
+  useEffect(() => {
+    stickToBottomRef.current = true;
+  }, [sessionId]);
+
+  useEffect(() => (
+    () => {
+      if (scrollFrameRef.current) {
+        cancelAnimationFrame(scrollFrameRef.current);
+      }
+    }
+  ), []);
 
   useEffect(() => {
     let isActive = true;
@@ -394,13 +380,9 @@ export default function HomePage() {
     }
 
     await sendMessage({ text: nextMessage });
+  }, [busy, sendMessage, sessionId]);
 
-    if (authUser) {
-      void fetchSessionsList();
-    }
-  }, [authUser, busy, fetchSessionsList, sendMessage, sessionId]);
-
-  async function handleSubmit(event) {
+  const handleSubmit = useCallback(async (event) => {
     event.preventDefault();
 
     const nextMessage = draft.trim();
@@ -411,18 +393,26 @@ export default function HomePage() {
 
     await sendText(nextMessage);
     setDraft('');
-  }
+  }, [draft, sendText]);
 
-  function handleKeyDown(event) {
+  const handleKeyDown = useCallback((event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       void handleSubmit(event);
     }
-  }
+  }, [handleSubmit]);
 
-  async function handleSuggestion(prompt) {
+  const handleSuggestion = useCallback(async (prompt) => {
     await sendText(prompt);
-  }
+  }, [sendText]);
+
+  const handleScroll = useCallback(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    stickToBottomRef.current = distanceFromBottom < 120;
+  }, []);
 
   const handleNewChat = useCallback(() => {
     stop();
@@ -542,8 +532,8 @@ export default function HomePage() {
     return (
       <div className="app-shell flex min-h-screen items-center justify-center p-6">
         <div className="panel-surface rounded-[1.75rem] px-8 py-10 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-secondary/80 text-foreground">
-            <Sparkles className="size-5 animate-float" />
+          <div className="mx-auto flex items-center justify-center rounded-2xl border border-border/70 bg-background/78 px-4 py-3">
+            <DeepEconometricsLogo className="h-9 w-auto" />
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
             Cargando DeepEconometrics...
@@ -572,86 +562,140 @@ export default function HomePage() {
       />
 
       <div className="app-shell">
-        <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-3 p-3 sm:p-4">
-          <ChatSidebar
-            collapsed={sidebarCollapsed}
-            currentSessionId={sessionId}
-            isAuthenticated={isAuthenticated}
-            onAuthenticate={() => setShowAuthDialog(true)}
-            onClearHistory={handleClearHistory}
-            onDeleteSession={handleDeleteSession}
-            onLogout={handleLogout}
-            onNewChat={handleNewChat}
-            onOpenAccount={() => setShowAccountDialog(true)}
-            onSelectSession={handleSelectSession}
-            onToggle={() => setSidebarCollapsed((current) => !current)}
-            sessions={sessions}
-            userEmail={authUser?.email || ''}
-          />
+        {isAuthenticated ? (
+      <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-3 p-3 sm:p-4">
+            <ChatSidebar
+              collapsed={sidebarCollapsed}
+              currentSessionId={sessionId}
+              onClearHistory={handleClearHistory}
+              onDeleteSession={handleDeleteSession}
+              onLogout={handleLogout}
+              onNewChat={handleNewChat}
+              onOpenAccount={() => setShowAccountDialog(true)}
+              onSelectSession={handleSelectSession}
+              onToggle={() => setSidebarCollapsed((current) => !current)}
+              sessions={sessions}
+              userEmail={authUser?.email || ''}
+            />
 
-          <main className="workspace-panel panel-surface flex min-w-0 flex-1 overflow-hidden rounded-[1.9rem]">
-            <div className="flex min-w-0 flex-1 flex-col">
-              <WorkspaceTopbar
-                busy={busy}
-                currentTitle={currentTitle}
-                error={error}
-                isAuthenticated={isAuthenticated}
-                isEmpty={isEmpty}
-                onNewChat={handleNewChat}
-                onOpenAuth={() => setShowAuthDialog(true)}
-              />
+            <main className="workspace-panel panel-surface flex min-w-0 flex-1 overflow-hidden rounded-[1.9rem]">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <WorkspaceTopbar
+                  busy={busy}
+                  currentTitle={currentTitle}
+                  error={error}
+                  onNewChat={handleNewChat}
+                />
 
-              <div className="flex min-h-0 flex-1">
-                <section className="flex min-w-0 flex-1 flex-col">
-                  <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-                    <div className="mx-auto flex w-full max-w-[54rem] flex-col px-4 pb-36 pt-8 sm:px-6 lg:px-8">
-                      {isEmpty ? (
-                        <EmptyWorkspace
-                          isAuthenticated={isAuthenticated}
-                          onOpenAuth={() => setShowAuthDialog(true)}
-                          onSelectPrompt={handleSuggestion}
-                        />
-                      ) : (
-                        <ChatWindow error={error} messages={messages} status={status} />
-                      )}
+                <div className="flex min-h-0 flex-1">
+                  <section className="flex min-w-0 flex-1 flex-col">
+                    <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
+                      <div className="mx-auto flex w-full max-w-[48rem] flex-col px-4 pb-36 pt-8 sm:px-6 lg:px-8">
+                        {isEmpty ? (
+                          <EmptyWorkspace />
+                        ) : (
+                          <ChatWindow
+                            artifacts={sessionArtifacts}
+                            error={error}
+                            messages={displayMessages}
+                            status={status}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background via-background/96 to-background/0 px-4 pb-4 pt-6 sm:px-6 lg:px-8">
-                    <div className="mx-auto w-full max-w-[54rem]">
-                      <ChatComposer
-                        busy={busy}
-                        disabled={!sessionId}
-                        draft={draft}
-                        helperText={isAuthenticated
-                          ? 'Esta conversacion queda asociada a tu cuenta y puede retomarse despues.'
-                          : 'Modo temporal: puedes usar el agente sin login, pero el historial se limpia al recargar.'}
-                        onChange={setDraft}
-                        onKeyDown={handleKeyDown}
-                        onStop={stop}
-                        onSubmit={handleSubmit}
-                        placeholder="Escribe una pregunta sobre inflacion, PIB, teoria economica, scraping o un forecast..."
-                        textareaRef={textareaRef}
-                        variant={isEmpty ? 'hero' : 'docked'}
+                    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background via-background/96 to-background/0 px-4 pb-4 pt-6 sm:px-6 lg:px-8">
+                      <div className="mx-auto w-full max-w-[48rem]">
+                        {isEmpty && (
+                          <div className="mb-3">
+                            <PromptSuggestions
+                              variant="minimal"
+                              onSelect={(prompt) => {
+                                void handleSuggestion(prompt);
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        <ChatComposer
+                          busy={busy}
+                          disabled={!sessionId}
+                          draft={draft}
+                          helperText="Esta conversacion queda asociada a tu cuenta y puede retomarse despues."
+                          onChange={setDraft}
+                          onKeyDown={handleKeyDown}
+                          onStop={stop}
+                          onSubmit={handleSubmit}
+                          placeholder="Escribe una pregunta sobre inflacion, PIB, teoria economica o un forecast..."
+                          textareaRef={textareaRef}
+                          variant={isEmpty ? 'minimal' : 'docked'}
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <ChatRightRail artifacts={sessionArtifacts} messages={displayMessages} />
+                </div>
+              </div>
+            </main>
+          </div>
+        ) : (
+          <div className="mx-auto flex min-h-screen w-full max-w-[1040px] flex-col px-4 pb-4 pt-3 sm:px-6 sm:pt-4">
+            <AnonymousTopbar
+              hasConversation={!isEmpty}
+              onNewChat={handleNewChat}
+              onOpenAuth={() => setShowAuthDialog(true)}
+            />
+
+            <main className="flex min-h-0 flex-1 flex-col">
+              <div ref={scrollRef} onScroll={handleScroll} className="min-h-0 flex-1 overflow-y-auto">
+                <div className="mx-auto flex min-h-full w-full max-w-[46rem] flex-col pb-40 pt-4 sm:pt-8">
+                  {isEmpty ? (
+                    <EmptyWorkspace />
+                  ) : (
+                    <div className="px-1 pb-8 pt-4 sm:pt-8">
+                      <ChatWindow
+                        artifacts={sessionArtifacts}
+                        error={error}
+                        messages={displayMessages}
+                        status={status}
                       />
                     </div>
-                  </div>
-                </section>
-
-                <ChatRightRail
-                  busy={busy}
-                  currentSessionTitle={currentSession?.title || ''}
-                  isAuthenticated={isAuthenticated}
-                  messages={messages}
-                  onInsertPrompt={(prompt) => {
-                    void handleSuggestion(prompt);
-                  }}
-                  onOpenAuth={() => setShowAuthDialog(true)}
-                />
+                  )}
+                </div>
               </div>
-            </div>
-          </main>
-        </div>
+
+              <div className="sticky bottom-0 z-10 bg-gradient-to-t from-background via-background/96 to-background/0 pb-4 pt-4">
+                <div className="mx-auto w-full max-w-[46rem]">
+                  {isEmpty && (
+                    <div className="mb-4">
+                      <PromptSuggestions
+                        variant="minimal"
+                        onSelect={(prompt) => {
+                          void handleSuggestion(prompt);
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <ChatComposer
+                    busy={busy}
+                    disabled={!sessionId}
+                    draft={draft}
+                    helperText={undefined}
+                    onChange={setDraft}
+                    onKeyDown={handleKeyDown}
+                    onStop={stop}
+                    onSubmit={handleSubmit}
+                    placeholder="Pregunta por datos, teoria economica, scraping o dashboards..."
+                    textareaRef={textareaRef}
+                    variant={isEmpty ? 'minimal' : 'docked'}
+                  />
+                </div>
+              </div>
+            </main>
+          </div>
+        )}
       </div>
     </>
   );

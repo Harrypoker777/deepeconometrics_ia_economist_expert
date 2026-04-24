@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { query } from '../db.js';
+import { config } from '../config.js';
 
 const FRED_BASE = 'https://api.stlouisfed.org/fred/series/observations';
 const WORLDBANK_BASE = 'https://api.worldbank.org/v2';
@@ -34,15 +35,45 @@ export const EXTERNAL_SOURCES = {
 };
 
 async function httpJson(url, init = {}) {
-  const response = await fetch(url, {
-    ...init,
-    headers: { Accept: 'application/json', ...(init.headers || {}) },
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`Fetch ${url} failed ${response.status}: ${text.slice(0, 200)}`);
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort(new Error(`HTTP_TIMEOUT:${config.externalSourceTimeoutMs}`));
+  }, config.externalSourceTimeoutMs);
+  const abortFromParent = () => timeoutController.abort(init.signal?.reason || new Error('HTTP_ABORTED'));
+
+  if (init.signal) {
+    if (init.signal.aborted) {
+      abortFromParent();
+    } else {
+      init.signal.addEventListener('abort', abortFromParent, { once: true });
+    }
   }
-  return response.json();
+
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: timeoutController.signal,
+      headers: { Accept: 'application/json', ...(init.headers || {}) },
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      throw new Error(`Fetch ${url} failed ${response.status}: ${text.slice(0, 200)}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    if (timeoutController.signal.reason?.message?.startsWith('HTTP_TIMEOUT:')) {
+      throw new Error(`Fetch ${url} timed out after ${config.externalSourceTimeoutMs}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+    if (init.signal) {
+      init.signal.removeEventListener('abort', abortFromParent);
+    }
+  }
 }
 
 export async function fetchFredSeries({ seriesId, startDate, endDate, apiKey }) {

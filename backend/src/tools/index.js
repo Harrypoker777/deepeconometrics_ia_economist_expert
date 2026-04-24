@@ -57,6 +57,8 @@ async function loadIndicators(queryClient, searchQuery, limit) {
   }));
 }
 
+const FORECAST_HISTORY_LIMIT = 120;
+
 async function loadIndicatorSeries(queryClient, indicator) {
   const indicatorResult = await queryClient(
     `
@@ -74,12 +76,16 @@ async function loadIndicatorSeries(queryClient, indicator) {
 
   const seriesResult = await queryClient(
     `
-      SELECT fecha, valor
-      FROM series_tiempo
-      WHERE indicador_id = $1
+      SELECT fecha, valor FROM (
+        SELECT fecha, valor
+        FROM series_tiempo
+        WHERE indicador_id = $1
+        ORDER BY fecha DESC
+        LIMIT $2
+      ) AS recent
       ORDER BY fecha ASC
     `,
-    [match.id]
+    [match.id, FORECAST_HISTORY_LIMIT]
   );
 
   return {
@@ -100,6 +106,34 @@ const pdfStyles = StyleSheet.create({
   small: { fontSize: 9, color: '#475569' },
 });
 
+function withToolMetrics(request, toolName, execute) {
+  return async (input) => {
+    const startedAt = Date.now();
+
+    try {
+      const output = await execute(input);
+      request.log.info(
+        {
+          durationMs: Date.now() - startedAt,
+          toolName,
+        },
+        'Tool execution completed'
+      );
+      return output;
+    } catch (error) {
+      request.log.error(
+        {
+          durationMs: Date.now() - startedAt,
+          err: error,
+          toolName,
+        },
+        'Tool execution failed'
+      );
+      throw error;
+    }
+  };
+}
+
 export function createEconomicTools({ queryClient, request, sessionId }) {
   return {
     search_knowledge_base: tool({
@@ -113,7 +147,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           .describe('Filtro opcional por categoria de documento.'),
         limit: z.number().int().min(1).max(8).default(4),
       }),
-      execute: async ({ query, category, limit }) => {
+      execute: withToolMetrics(request, 'search_knowledge_base', async ({ query, category, limit }) => {
         const results = await searchKnowledge({ q: query, limit, category: category || null });
         return {
           total: results.length,
@@ -130,7 +164,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
             content: row.content,
           })),
         };
-      },
+      }),
     }),
 
     list_knowledge_topics: tool({
@@ -140,13 +174,13 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
         category: z.string().optional(),
         limit: z.number().int().min(1).max(100).default(40),
       }),
-      execute: async ({ category, limit }) => {
+      execute: withToolMetrics(request, 'list_knowledge_topics', async ({ category, limit }) => {
         const [categories, documents] = await Promise.all([
           listKnowledgeCategories(),
           listKnowledgeDocuments({ category: category || null, limit }),
         ]);
         return { categories, documents };
-      },
+      }),
     }),
 
     read_indicators: tool({
@@ -156,10 +190,10 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
         query: z.string().default('').describe('Codigo, nombre o termino relacionado.'),
         limit: z.number().int().min(1).max(10).default(5),
       }),
-      execute: async ({ query, limit }) => {
+      execute: withToolMetrics(request, 'read_indicators', async ({ query, limit }) => {
         const indicators = await loadIndicators(queryClient, query.trim(), limit);
         return { total: indicators.length, indicators };
-      },
+      }),
     }),
 
     ingest_external_series: tool({
@@ -187,14 +221,14 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           })
           .describe('Parametros especificos de la fuente (ver knowledge/fuentes).'),
       }),
-      execute: async (input) => {
+      execute: withToolMetrics(request, 'ingest_external_series', async (input) => {
         const result = await ingestExternalSeries(input);
         return {
           source: input.source,
           sourceInfo: EXTERNAL_SOURCES[input.source] || null,
           ...result,
         };
-      },
+      }),
     }),
 
     generate_forecast: tool({
@@ -208,7 +242,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           .array(z.object({ label: z.string(), value: z.number() }))
           .optional(),
       }),
-      execute: async ({ indicator, horizon, confidenceLevel, observations }) => {
+      execute: withToolMetrics(request, 'generate_forecast', async ({ indicator, horizon, confidenceLevel, observations }) => {
         let sourceSeries = observations;
         let indicatorMeta = null;
 
@@ -239,7 +273,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           },
           ...result,
         };
-      },
+      }),
     }),
 
     generate_chart: tool({
@@ -258,11 +292,11 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           })
         ),
       }),
-      execute: async ({ title, summary, series }) => ({
+      execute: withToolMetrics(request, 'generate_chart', async ({ title, summary, series }) => ({
         chart: { title, summary, series },
         title,
         summary,
-      }),
+      })),
     }),
 
     generate_excel: tool({
@@ -282,7 +316,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           })
         ),
       }),
-      execute: async ({ title, summary, rows }) => {
+      execute: withToolMetrics(request, 'generate_excel', async ({ title, summary, rows }) => {
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'DeepEconometrics Lab';
         workbook.created = new Date();
@@ -323,7 +357,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           downloadUrl: stored.downloadUrl,
           fileName: stored.fileName,
         };
-      },
+      }),
     }),
 
     generate_pdf: tool({
@@ -342,7 +376,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           })
         ),
       }),
-      execute: async ({ title, summary, rows }) => {
+      execute: withToolMetrics(request, 'generate_pdf', async ({ title, summary, rows }) => {
         const tailRows = rows.slice(-8);
         const reportDocument = React.createElement(
           Document,
@@ -396,7 +430,7 @@ export function createEconomicTools({ queryClient, request, sessionId }) {
           downloadUrl: stored.downloadUrl,
           fileName: stored.fileName,
         };
-      },
+      }),
     }),
   };
 }

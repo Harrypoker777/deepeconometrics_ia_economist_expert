@@ -1,6 +1,6 @@
 'use client';
 
-import { LoaderCircle, Send, Square } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 
 export function ChatComposer({
   busy,
@@ -15,16 +15,22 @@ export function ChatComposer({
   textareaRef,
   variant = 'docked',
 }) {
-  const expanded = variant === 'hero';
+  const minimal = variant === 'minimal';
+  const expanded = variant === 'hero' || variant === 'minimal';
+  const shellClass = minimal
+    ? 'rounded-[1.8rem] p-3 sm:p-3.5'
+    : expanded
+      ? 'rounded-[1.6rem] p-3.5 sm:p-4'
+      : 'rounded-[1.45rem] p-3 sm:p-3.5';
 
   return (
-    <div className={`composer-shell ${expanded ? 'rounded-[1.75rem] p-4 sm:p-5' : 'rounded-[1.5rem] p-3.5 sm:p-4'}`}>
+    <div className={`composer-shell ${shellClass}`}>
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <div className="flex items-end gap-3">
-          <div className="min-w-0 flex-1 rounded-[1.25rem] border border-border/80 bg-background/75 px-4 py-3 transition-colors focus-within:border-accent/35 focus-within:bg-background">
+          <div className={`min-w-0 flex-1 rounded-[1.35rem] border border-border/80 bg-background/82 px-4 transition-colors focus-within:border-accent/40 focus-within:bg-background ${minimal ? 'py-3.5' : 'py-3'}`}>
             <textarea
               ref={textareaRef}
-              className={`${expanded ? 'min-h-[108px] max-h-56' : 'min-h-[88px] max-h-48'} w-full resize-none bg-transparent text-[15px] leading-7 text-foreground placeholder:text-muted-foreground focus:outline-none`}
+              className={`${minimal ? 'min-h-[70px] max-h-40' : expanded ? 'min-h-[92px] max-h-56' : 'min-h-[72px] max-h-48'} w-full resize-none bg-transparent text-[15px] leading-7 text-foreground placeholder:text-muted-foreground focus:outline-none`}
               disabled={disabled || busy}
               onChange={(event) => onChange(event.target.value)}
               onKeyDown={onKeyDown}
@@ -33,35 +39,23 @@ export function ChatComposer({
               value={draft}
             />
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3 text-[11px] text-muted-foreground">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="status-pill">
-                  {busy ? (
-                    <LoaderCircle className="size-3 animate-spin text-accent-strong" />
-                  ) : (
-                    <span className="dot-pulse" />
-                  )}
-                  {busy ? 'Thinking' : 'Enter para enviar'}
-                </span>
-
-                <span className="status-pill">
-                  Chat-first
-                </span>
-
-                <span className="status-pill">
-                  Tools server-side
+            {!minimal && (
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/70 pt-3 text-[11px] text-muted-foreground">
+                <p className="truncate">
+                  {helperText || 'Enter para enviar. Shift + Enter para salto.'}
+                </p>
+                <span className="hidden sm:block">
+                  {busy ? 'Respondiendo...' : 'Chat en vivo'}
                 </span>
               </div>
-
-              <span className="hidden sm:block">Shift + Enter para salto</span>
-            </div>
+            )}
           </div>
 
           {busy ? (
             <button
               type="button"
               onClick={onStop}
-              className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-colors hover:bg-primary/92"
+              className={`flex shrink-0 items-center justify-center bg-primary text-primary-foreground transition-colors hover:bg-primary/92 ${minimal ? 'size-11 rounded-[1.35rem]' : 'size-12 rounded-2xl'}`}
               aria-label="Detener"
             >
               <Square className="size-4" />
@@ -70,17 +64,13 @@ export function ChatComposer({
             <button
               type="submit"
               disabled={disabled || !draft.trim()}
-              className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-colors hover:bg-primary/92 disabled:opacity-40"
+              className={`flex shrink-0 items-center justify-center bg-primary text-primary-foreground transition-colors hover:bg-primary/92 disabled:opacity-40 ${minimal ? 'size-11 rounded-[1.35rem]' : 'size-12 rounded-2xl'}`}
               aria-label="Enviar"
             >
               <Send className="size-4" />
             </button>
           )}
         </div>
-
-        <p className="px-1 text-[11px] leading-5 text-muted-foreground">
-          {helperText}
-        </p>
       </form>
     </div>
   );

@@ -1,4 +1,5 @@
 import { Inter } from 'next/font/google';
+import 'katex/dist/katex.min.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import './globals.css';
 
